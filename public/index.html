@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1a2b">
+<title>Loopball</title>
+<meta name="description" content="Loopball: you are a ring. Cradle the orb, dash to shoot. Play 2D or 3D against bots or with friends online.">
+<meta property="og:title" content="Loopball">
+<meta property="og:description" content="One stick. One button. Cradle the orb, dash to fire it. Play with friends in 2D or 3D.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Loopball">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;600;700&display=swap">
+<style>
+/* Layout: one centered column on phones, a code bar above two game cards on wider screens; the stadium navy and team colors carry over from the games */
+:root{
+  --stadium:#0e1a2b;--stadium-2:#172840;--stadium-3:#203553;--ice:#e6eef2;--ink:#0f1620;
+  --blue:#3a62ff;--orange:#ff7536;--chalk:#f3f6f9;--muted:#93a6bc;--line:rgba(243,246,249,.16);
+  --display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;
+  --body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{min-height:100%}
+body{margin:0;min-height:100%;background:radial-gradient(1200px 600px at 70% -10%,#1b3150 0%,var(--stadium) 60%) fixed,var(--stadium);color:var(--chalk);font-family:var(--body);font-size:16px;line-height:1.5}
+[hidden]{display:none!important}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(env(safe-area-inset-top,0px) + 28px) calc(env(safe-area-inset-bottom,0px) + 40px);display:flex;flex-direction:column;gap:28px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.logo{font-family:var(--display);font-weight:900;font-size:clamp(60px,13vw,112px);line-height:.85;margin:0;display:flex;align-items:center;text-transform:uppercase;letter-spacing:.01em}
+.logo svg{height:.66em;width:.66em;margin:0 .02em;flex:none}
+.tag{margin:6px 0 0;color:var(--muted);font-size:17px;max-width:38ch}
+.tag b{color:var(--chalk);font-weight:600}
+.online{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.online i{width:9px;height:9px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 4px rgba(61,220,132,.15)}
+.bar{display:grid;grid-template-columns:1fr 1.4fr;gap:14px}
+@media (max-width:760px){.bar{grid-template-columns:1fr}}
+.panel{background:rgba(23,40,64,.72);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.lbl{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+input[type=text]{font:inherit;font-size:18px;font-weight:600;padding:11px 14px;border-radius:10px;border:2px solid var(--line);background:var(--stadium);color:var(--chalk);width:100%;min-width:0}
+input[type=text]:focus{outline:none;border-color:var(--chalk)}
+.joinrow{display:flex;gap:10px}
+#code{flex:1;font-family:var(--display);font-weight:900;font-size:30px;letter-spacing:.24em;text-transform:uppercase;padding:6px 14px}
+.btn{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.04em;text-transform:uppercase;padding:10px 18px;border-radius:11px;border:2px solid var(--line);background:var(--stadium-3);color:var(--chalk);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:space-between;gap:12px;transition:transform .12s,border-color .12s}
+.btn:hover,.btn:focus-visible{border-color:var(--chalk);outline:none;transform:translateY(-1px)}
+.btn.primary{background:var(--blue);border-color:var(--blue)}
+.btn.warm{background:var(--orange);border-color:var(--orange);color:var(--ink)}
+.btn .k{font-family:var(--body);font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;opacity:.8}
+.msg{margin:0;font-size:14px;color:#ffd2bd;min-height:1.5em}
+.games{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.games{grid-template-columns:1fr}}
+.card{border-radius:18px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(32,53,83,.9),rgba(23,40,64,.9));overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.art{aspect-ratio:16/8;max-width:100%;display:block;width:100%}
+.card .body{padding:18px;display:flex;flex-direction:column;gap:12px}
+.card h2{font-family:var(--display);font-weight:900;font-size:46px;line-height:.9;margin:0;text-transform:uppercase;display:flex;align-items:baseline;gap:12px}
+.card h2 .d{font-size:.5em;padding:.06em .3em;border:3px solid var(--chalk);border-radius:.2em;line-height:1}
+.card p{margin:0;color:var(--muted);max-width:44ch}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acts .btn{font-size:19px;padding:10px 14px}
+.acts .wide{grid-column:1/-1}
+.hint{margin:0;font-size:14px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(23,40,64,.6)}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:760px){.how{grid-template-columns:1fr}}
+.how div{padding:14px 16px;border-top:3px solid var(--blue);background:rgba(23,40,64,.45);border-radius:0 0 12px 12px}
+.how div:nth-child(2){border-color:var(--orange)}
+.how div:nth-child(3){border-color:var(--chalk)}
+.how b{display:block;font-family:var(--display);font-size:22px;text-transform:uppercase;letter-spacing:.03em}
+.how span{color:var(--muted);font-size:15px}
+footer{color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}.btn:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 class="logo" aria-label="Loopball">L<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" fill="none" stroke="#3a62ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="72 22.25" transform="rotate(32 20 20)"/></svg><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" fill="none" stroke="#ff7536" stroke-width="7" stroke-linecap="round" stroke-dasharray="72 22.25" transform="rotate(212 20 20)"/><circle cx="25" cy="20" r="4.5" fill="#f3f6f9"/></svg>PBALL</h1>
+      <p class="tag">You are a ring with an open side. <b>Drive into the orb to cradle it, dash to fire it.</b> One stick, one button, endless skill.</p>
+    </div>
+    <div class="online" id="online" hidden><i></i><span id="onlineN"></span></div>
+  </header>
+
+  <div class="bar">
+    <div class="panel">
+      <label class="lbl" for="name">Your name</label>
+      <input type="text" id="name" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Player">
+    </div>
+    <div class="panel">
+      <label class="lbl" for="code">Got a code from a friend?</label>
+      <div class="joinrow"><input type="text" id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn primary" id="join">Join</button></div>
+      <p class="msg" id="msg" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div class="games">
+    <section class="card">
+      <canvas class="art" id="art2" width="640" height="320" aria-label="Top-down view of the 2D arena"></canvas>
+      <div class="body">
+        <h2>Loopball <span class="d">2D</span></h2>
+        <p>The original, seen from above. Fast, readable, and perfect on a phone held either way.</p>
+        <div class="acts">
+          <a class="btn warm wide" href="/2d/?host=1">Host for friends <span class="k">Get a code</span></a>
+          <a class="btn primary" href="/2d/?go=bots">Vs bots</a>
+          <a class="btn" href="/2d/?go=online">Open matches</a>
+          <a class="btn" href="/2d/?go=free">Free play</a>
+          <a class="btn" href="/2d/">Menu</a>
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <canvas class="art" id="art3" width="640" height="320" aria-label="Chase camera view of the 3D arena"></canvas>
+      <div class="body">
+        <h2>Loopball <span class="d">3D</span></h2>
+        <p>Real height. Hop, scoop the orb into the air and dash for aerial shots, with ball cam and goal replays.</p>
+        <div class="acts">
+          <a class="btn warm wide" href="/3d/?host=1">Host for friends <span class="k">Get a code</span></a>
+          <a class="btn primary" href="/3d/?go=bots">Vs bots</a>
+          <a class="btn" href="/3d/?go=online">Open matches</a>
+          <a class="btn" href="/3d/?go=free">Free play</a>
+          <a class="btn" href="/3d/">Menu</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="hint" id="installHint" hidden></p>
+
+  <div class="how">
+    <div><b>Host</b><span>Pick 2D or 3D and tap Host for friends. You get a 5-letter code and an invite link to send.</span></div>
+    <div><b>Set it up</b><span>Choose 1v1, 2v2 or 3v3, move players between teams, or put all your friends against bots.</span></div>
+    <div><b>Play</b><span>Hit Start. Empty spots fill with bots, and anyone who joins late takes over a bot.</span></div>
+  </div>
+
+  <footer>Phone: left thumb steers, right side dashes. Computer: mouse or keys, pick in Controls. Controllers work too.</footer>
+</div>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const getJ=k=>{try{const v=localStorage.getItem(k);return v==null?null:JSON.parse(v)}catch{return null}};
+const setJ=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+// one name for both games
+const name=$('name');name.value=getJ('loopball.name')||getJ('loopball3d.name')||'';
+name.addEventListener('input',()=>{const v=name.value.trim().slice(0,14);setJ('loopball.name',v);setJ('loopball3d.name',v)});
+const code=$('code'),msg=$('msg');
+async function join(raw){
+  const c=String(raw||'').toLowerCase().replace(/[^a-z]/g,'');
+  if(c.length!==5){msg.textContent='Match codes are 5 letters.';return}
+  msg.textContent='Looking for that match…';
+  try{
+    const r=await fetch('/api/code/'+c,{cache:'no-store'});const j=await r.json();
+    if(j&&(j.game==='2d'||j.game==='3d')){location.href='/'+j.game+'/?join='+c;return}
+    msg.textContent='No match is open with code '+c.toUpperCase()+' right now. Check it with your friend.';
+  }catch{msg.textContent='Can’t reach the server. Check your connection and try again.'}
+}
+$('join').addEventListener('click',()=>join(code.value));
+code.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();join(code.value)}});
+// invite links land here as /?join=CODE
+try{const q=new URLSearchParams(location.search),j=q.get('join');if(j){code.value=j.toUpperCase();history.replaceState(null,'','/');join(j)}}catch{}
+// players online
+async function stats(){try{const r=await fetch('/api/stats',{cache:'no-store'});const j=await r.json();const n=j.online|0;$('onlineN').textContent=n+(n===1?' player online':' players online');$('online').hidden=false}catch{}}
+stats();setInterval(stats,20000);
+// install hint
+const installed=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches||navigator.standalone===true;
+if(!installed){
+  const ios=/iPhone|iPod|iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),h=$('installHint');
+  if(ios){h.textContent='Full screen on iPhone: tap Share, then Add to Home Screen, and open Loopball from your home screen.';h.hidden=false}
+  else if(matchMedia('(pointer:coarse)').matches){h.textContent='For full screen with no browser bars, use your browser menu’s Install app or Add to Home screen.';h.hidden=false}
+}
+// card art: tiny live scenes
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function ringPath(c,x,y,r,f,gap){c.beginPath();c.arc(x,y,r,f+gap,f-gap+Math.PI*2)}
+function draw2(t){
+  const c=$('art2').getContext('2d'),W=640,H=320;
+  c.fillStyle='#0e1a2b';c.fillRect(0,0,W,H);
+  c.fillStyle='#e6eef2';c.beginPath();c.roundRect?c.roundRect(40,30,560,260,70):c.rect(40,30,560,260);c.fill();
+  c.strokeStyle='rgba(15,22,32,.14)';c.lineWidth=3;c.beginPath();c.moveTo(320,30);c.lineTo(320,290);c.stroke();c.beginPath();c.arc(320,160,50,0,6.283);c.stroke();
+  c.fillStyle='rgba(58,98,255,.15)';c.beginPath();c.arc(40,160,80,-1.571,1.571);c.fill();c.fillStyle='rgba(255,117,54,.15)';c.beginPath();c.arc(600,160,80,1.571,4.712);c.fill();
+  c.fillStyle='#3a62ff';c.fillRect(22,120,18,80);c.fillStyle='#ff7536';c.fillRect(600,120,18,80);
+  const a=t/1400,bx=320+Math.cos(a)*150,by=160+Math.sin(a*1.6)*70;
+  const rx=bx-Math.cos(a)*30-24,ry=by-Math.sin(a*1.6)*14;
+  c.lineCap='round';c.lineWidth=9;c.strokeStyle='#3a62ff';ringPath(c,rx,ry,24,Math.atan2(by-ry,bx-rx),.68);c.stroke();
+  c.strokeStyle='#ff7536';ringPath(c,640-rx,320-ry,24,Math.PI+a,.68);c.stroke();
+  c.fillStyle='#ffffff';c.beginPath();c.arc(bx,by,11,0,6.283);c.fill();c.fillStyle='#0f1620';c.beginPath();c.arc(bx,by,8.5,0,6.283);c.fill();
+}
+function draw3(t){
+  const c=$('art3').getContext('2d'),W=640,H=320;
+  const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0e1a2b');g.addColorStop(.45,'#1c3150');g.addColorStop(.46,'#dfe7ec');g.addColorStop(1,'#c9d5de');c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.fillStyle='#24395a';c.fillRect(0,110,W,38);
+  c.strokeStyle='#ff7536';c.lineWidth=5;c.strokeRect(270,96,100,48);
+  c.strokeStyle='rgba(255,117,54,.45)';c.lineWidth=1;for(let i=280;i<370;i+=10){c.beginPath();c.moveTo(i,96);c.lineTo(i,144);c.stroke()}
+  c.strokeStyle='rgba(15,22,32,.25)';c.lineWidth=3;c.beginPath();c.ellipse(320,215,170,40,0,0,6.283);c.stroke();
+  const hop=Math.max(0,Math.sin(t/520))*46,ox=320+Math.sin(t/900)*40,oy=170-Math.abs(Math.sin(t/430))*60;
+  c.fillStyle='rgba(15,22,32,.25)';c.beginPath();c.ellipse(ox,215,14,5,0,0,6.283);c.fill();
+  c.fillStyle='rgba(15,22,32,.22)';c.beginPath();c.ellipse(320,290,62,14,0,0,6.283);c.fill();
+  const y=262-hop;
+  c.fillStyle='#2f53e0';c.beginPath();c.ellipse(320,y+18,58,20,0,0,Math.PI);c.lineTo(262,y);c.ellipse(320,y,58,20,0,Math.PI,0,true);c.fill();
+  c.fillStyle='#4f74ff';c.beginPath();c.ellipse(320,y,58,20,0,0,6.283);c.fill();
+  c.fillStyle='#1d2f6e';c.beginPath();c.ellipse(320,y,44,13,0,0,6.283);c.fill();
+  c.fillStyle='#dfe7ec';c.beginPath();c.moveTo(300,y-20);c.lineTo(340,y-20);c.lineTo(334,y-6);c.lineTo(306,y-6);c.fill();
+  c.fillStyle='#ffffff';c.beginPath();c.arc(ox,oy,13,0,6.283);c.fill();c.fillStyle='#151b24';c.beginPath();c.arc(ox,oy,10.5,0,6.283);c.fill();
+}
+function loop(t){draw2(t);draw3(t);if(!reduce)requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+})();
+</script>
+</body>
+</html>

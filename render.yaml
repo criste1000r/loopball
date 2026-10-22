@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: loopball
+    runtime: node
+    plan: free
+    buildCommand: echo "Nothing to build"
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
