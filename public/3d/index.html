@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0e1a2b">
 <meta name="description" content="Loopball 3D: hop, aerials, ball cam and goal replays.">
-<link rel="manifest" href="/manifest.webmanifest">
+<script>(function(){var h='/manifest.webmanifest';try{var L=localStorage,i=L.getItem('lb.rid'),k=L.getItem('lb.rkey'),q=[],ip=/iPhone|iPod/.test(navigator.userAgent)&&navigator.standalone!==true&&!/[?&]rk=/.test(location.search);
+if(ip&&!(/^[a-z0-9]{10,24}$/.test(i||'')&&/^[A-Za-z0-9]{16,48}$/.test(k||''))&&window.crypto){var r=function(n,a){var b=new Uint32Array(n),o='';crypto.getRandomValues(b);for(var j=0;j<n;j++)o+=a[b[j]%a.length];return o};i=r(12,'abcdefghijklmnopqrstuvwxyz0123456789');k=r(24,'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789');L.setItem('lb.rid',i);L.setItem('lb.rkey',k)}
+if(/^[a-z0-9]{10,24}$/.test(i||'')&&/^[A-Za-z0-9]{16,48}$/.test(k||''))q.push('rk=LB-'+i+'-'+k);var n=JSON.parse(L.getItem('loopball.name')||'""')||JSON.parse(L.getItem('loopball3d.name')||'""');if(n)q.push('nm='+encodeURIComponent(String(n).slice(0,14)));if(q.length)h+='?'+q.join('&')}catch(e){}
+document.write('<link rel="manifest" href="'+h+'">')})();</script>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -368,6 +371,7 @@ a.back{text-decoration:none;display:inline-block}
 <div id="toast" hidden></div>
 
 <script src="/ranks.js"></script>
+<script src="/ios.js"></script>
 <script>
 /* Loopball standalone networking: provides the same room interface the game
    uses inside Claude, backed by this site's own WebSocket server. */
@@ -1125,10 +1129,13 @@ const FS={
   on(){return !!(document.fullscreenElement||document.webkitFullscreenElement)},
   enter(){if(!this.can||this.on())return;try{const el=document.documentElement,p=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):el.webkitRequestFullscreen&&el.webkitRequestFullscreen();if(p&&p.catch)p.catch(()=>{})}catch{}},
   exit(){try{const p=document.exitFullscreen?document.exitFullscreen():document.webkitExitFullscreen&&document.webkitExitFullscreen();if(p&&p.catch)p.catch(()=>{})}catch{}},
-  toggle(){if(this.on())this.exit();else this.enter()},
+  // iPhones have no full screen for web pages; there the button explains Add to Home Screen instead
+  ios:!!(window.LoopIOS&&window.LoopIOS.need()),
+  toggle(){if(!this.can&&this.ios){window.LoopIOS.guide();return}if(this.on())this.exit();else this.enter()},
   auto(){if(Input.touchUI&&!this.installed)this.enter()}
 };
-document.querySelectorAll('.fsLink').forEach(b=>{b.hidden=!FS.can});
+document.querySelectorAll('.fsLink').forEach(b=>{b.hidden=!(FS.can||FS.ios)});
+if(FS.ios)window.LoopIOS.maybe();
 $('fsBtn').addEventListener('click',()=>FS.toggle());
 
 /* ================= app state ================= */
@@ -1171,7 +1178,7 @@ function syncHud(){
   const showTouch=playing&&Input.touchUI&&app.mySlot>=0;
   touchEl.hidden=!playing;stickEl.hidden=!showTouch;dashEl.hidden=!showTouch;hopEl.hidden=!showTouch;
   $('dashMeter').hidden=!(playing&&!Input.touchUI&&app.mySlot>=0);
-  $('fsBtn').hidden=!(playing&&FS.can&&!FS.installed);
+  $('fsBtn').hidden=!(playing&&(FS.can||FS.ios)&&!FS.installed);
   labelsEl.hidden=app.mode==='attract'||app.mode==='free';
   if(!playing){Input.stickT=null;Input.keys.clear();document.body.classList.remove('replaying');$('replayUI').hidden=true;$('skipBtn').hidden=true}
 }
@@ -1218,7 +1225,8 @@ touchEl.addEventListener('pointerdown',e=>{
   e.preventDefault();
   if(!Input.touchUI){Input.touchUI=true;syncHud()}
   if(e.clientX<innerWidth*.5){
-    if(!Input.stickT){Input.stickT={id:e.pointerId,ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY};placeStick()}
+    // a new touch on the left always takes the stick, so a stick whose finger-up got lost can never stay stuck
+    Input.stickT={id:e.pointerId,ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY};placeStick()
   }else{
     const[dx,dy]=centerOf(dashEl),[hx,hy]=centerOf(hopEl);
     if(Math.hypot(e.clientX-hx,e.clientY-hy)<Math.hypot(e.clientX-dx,e.clientY-dy)){Input.hopQ=true;pressAnim(hopEl)}
@@ -1235,7 +1243,13 @@ touchEl.addEventListener('pointermove',e=>{
 const endTouch=e=>{const s=Input.stickT;if(s&&s.id===e.pointerId){Input.stickT=null;placeStick()}};
 window.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'){Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;Input.mouse.has=true}},{passive:true});
 touchEl.addEventListener('contextmenu',e=>e.preventDefault());
-touchEl.addEventListener('pointerup',endTouch);touchEl.addEventListener('pointercancel',endTouch);
+touchEl.addEventListener('pointerup',endTouch);touchEl.addEventListener('pointercancel',endTouch);touchEl.addEventListener('lostpointercapture',endTouch);
+// safety nets: catch finger-ups that land somewhere else, and drop the stick whenever no finger is on the screen
+window.addEventListener('pointerup',endTouch,true);window.addEventListener('pointercancel',endTouch,true);
+const noFingers=e=>{if(!e.touches||e.touches.length===0){if(Input.stickT){Input.stickT=null;placeStick()}}};
+window.addEventListener('touchend',noFingers,true);window.addEventListener('touchcancel',noFingers,true);
+const dropStick=()=>{if(Input.stickT){Input.stickT=null;placeStick()}};
+window.addEventListener('blur',dropStick);document.addEventListener('visibilitychange',dropStick);
 function placeStick(){
   const s=Input.stickT;
   if(!s){stickEl.style.left='calc(max(16px, env(safe-area-inset-left, 0px)) + 96px)';stickEl.style.top='calc(100% - env(safe-area-inset-bottom, 0px) - 110px)';stickEl.style.opacity='.5';knobEl.style.transform='';return}

@@ -8,7 +8,10 @@
 <meta name="description" content="Loopball: you are a ring. Cradle the orb, dash to shoot. Play 2D or 3D against bots or with friends online.">
 <meta property="og:title" content="Loopball">
 <meta property="og:description" content="One stick. One button. Cradle the orb, dash to fire it. Play with friends in 2D or 3D.">
-<link rel="manifest" href="/manifest.webmanifest">
+<script>(function(){var h='/manifest.webmanifest';try{var L=localStorage,i=L.getItem('lb.rid'),k=L.getItem('lb.rkey'),q=[],ip=/iPhone|iPod/.test(navigator.userAgent)&&navigator.standalone!==true&&!/[?&]rk=/.test(location.search);
+if(ip&&!(/^[a-z0-9]{10,24}$/.test(i||'')&&/^[A-Za-z0-9]{16,48}$/.test(k||''))&&window.crypto){var r=function(n,a){var b=new Uint32Array(n),o='';crypto.getRandomValues(b);for(var j=0;j<n;j++)o+=a[b[j]%a.length];return o};i=r(12,'abcdefghijklmnopqrstuvwxyz0123456789');k=r(24,'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789');L.setItem('lb.rid',i);L.setItem('lb.rkey',k)}
+if(/^[a-z0-9]{10,24}$/.test(i||'')&&/^[A-Za-z0-9]{16,48}$/.test(k||''))q.push('rk=LB-'+i+'-'+k);var n=JSON.parse(L.getItem('loopball.name')||'""')||JSON.parse(L.getItem('loopball3d.name')||'""');if(n)q.push('nm='+encodeURIComponent(String(n).slice(0,14)));if(q.length)h+='?'+q.join('&')}catch(e){}
+document.write('<link rel="manifest" href="'+h+'">')})();</script>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -220,6 +223,7 @@ footer{color:var(--muted);font-size:13px}
   <footer>Phone: left thumb steers, right side dashes. Computer: mouse or keys, pick in Controls. Controllers work too.</footer>
 </div>
 <script src="/ranks.js"></script>
+<script src="/ios.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -242,6 +246,15 @@ async function join(raw){
 }
 $('join').addEventListener('click',()=>join(code.value));
 code.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();join(code.value)}});
+// an iPhone Home Screen app starts at /?rk=CODE&nm=NAME with empty storage: take the ranks and name along
+try{
+  const q=new URLSearchParams(location.search),rk=q.get('rk'),nm=q.get('nm');
+  if(rk||nm){
+    if(rk&&window.LoopRanks&&!LoopRanks.identity(false))LoopRanks.restore(rk);
+    if(nm&&!name.value){const v=nm.trim().slice(0,14);name.value=v;setJ('loopball.name',v);setJ('loopball3d.name',v)}
+    q.delete('rk');q.delete('nm');history.replaceState(null,'','/'+(q.toString()?'?'+q:''));
+  }
+}catch{}
 // invite links land here as /?join=CODE
 try{const q=new URLSearchParams(location.search),j=q.get('join');if(j){code.value=j.toUpperCase();history.replaceState(null,'','/');join(j)}}catch{}
 // ---------- ranks: Star Chart, leaderboard, ladder ----------
@@ -336,7 +349,8 @@ stats();setInterval(stats,20000);
 const installed=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches||navigator.standalone===true;
 if(!installed){
   const ios=/iPhone|iPod|iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),h=$('installHint');
-  if(ios){h.textContent='Full screen on iPhone: tap Share, then Add to Home Screen, and open Loopball from your home screen.';h.hidden=false}
+  if(window.LoopIOS&&LoopIOS.need()){h.innerHTML='<b>Full screen on iPhone:</b> add Loopball to your Home Screen and open it from there. <button class="btn sm" id="iosHow" type="button">Show me how</button>';h.hidden=false;$('iosHow').addEventListener('click',()=>LoopIOS.guide());LoopIOS.maybe()}
+  else if(ios){}
   else if(matchMedia('(pointer:coarse)').matches){h.textContent='For full screen with no browser bars, use your browser menu’s Install app or Add to Home screen.';h.hidden=false}
 }
 // card art: tiny live scenes

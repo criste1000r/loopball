@@ -65,6 +65,21 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify(Object.assign({ online: byId.size }, ranked ? ranked.stats() : {})));
   }
+  // The manifest's start address can carry the ranked code and name (see build.py), so an iPhone
+  // Home Screen app, which starts with empty storage, keeps the player's ranks.
+  if (p === '/manifest.webmanifest') {
+    return fs.readFile(path.join(PUB, 'manifest.webmanifest'), 'utf8', (err, data) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      let m; try { m = JSON.parse(data); } catch { res.writeHead(500); return res.end(); }
+      const q = new URL(req.url, 'http://x').searchParams, out = new URLSearchParams();
+      const rk = q.get('rk') || '', nm = (q.get('nm') || '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 14);
+      if (/^LB-[a-z0-9]{10,24}-[A-Za-z0-9]{16,48}$/.test(rk)) out.set('rk', rk);
+      if (nm.trim()) out.set('nm', nm.trim());
+      if ([...out.keys()].length) m.start_url = '/?' + out.toString();
+      res.writeHead(200, { 'content-type': 'application/manifest+json', 'cache-control': 'no-cache' });
+      res.end(JSON.stringify(m));
+    });
+  }
   if (p === '/2d' || p === '/3d') { res.writeHead(301, { location: p + '/' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '') }); return res.end(); }
   if (p.endsWith('/')) p += 'index.html';
   const file = path.join(PUB, path.normalize(p));
