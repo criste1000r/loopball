@@ -3,6 +3,7 @@ services:
     name: loopball
     runtime: node
     plan: free
+    region: virginia
     buildCommand: echo "Nothing to build"
     startCommand: node server.js
     healthCheckPath: /healthz
