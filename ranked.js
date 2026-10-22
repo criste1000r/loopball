@@ -10,7 +10,7 @@ const MATCH_SECONDS = Number(process.env.RANKED_SECONDS) || 180;   // override o
 const SNAP_HZ = 45;
 const JOIN_WAIT = 14;          // seconds to wait for matched players to arrive before bots stand in
 const LEAVE_GRACE = 6;         // seconds a player may drop out before a bot takes over and it counts as a loss
-const BOT_WAIT_ALONE = 7;      // nobody else queueing: a bot match starts after this many seconds
+const BOT_WAIT_ALONE = [5, 14]; // nobody else queueing: bots step in after a wait somewhere in this range (seconds)
 const BOT_WAIT_CROWD = 20;     // others queueing but too far apart in rating: wait this long before bots fill
 const PID_RE = /^[a-z0-9]{10,24}$/, KEY_RE = /^[A-Za-z0-9]{16,48}$/;
 const BOT_TAGS = ['Nyx', 'orbitz', 'Kairo', 'zeph', 'Mako', 'lumen', 'Brixx', 'Sora', 'vanta', 'Rook', 'Ember', 'Pax', 'juno_k', 'Halcyon',
@@ -111,7 +111,7 @@ function createRanked({ relay, store, publicDir }) {
     if (!queues.has(mk)) queues.set(mk, []);
     queues.get(mk).push(e);
     byPid.set(m.pid, e);
-    conn.send(JSON.stringify({ t: 'rq', st: 'queued', g: game, md, n: queues.get(mk).length }));
+    conn.send(JSON.stringify({ t: 'rq', st: 'queued', g: game, md }));
   }
   function removeFromQueue(e) {
     const q = queues.get(e.mk); if (q) { const i = q.indexOf(e); if (i >= 0) q.splice(i, 1); }
@@ -132,7 +132,8 @@ function createRanked({ relay, store, publicDir }) {
         const win = Math.min(700, 120 + waited * 22);
         const near = q.filter(x => Math.abs(x.mmr - e.mmr) <= win).sort((a, b) => Math.abs(a.mmr - e.mmr) - Math.abs(b.mmr - e.mmr)).slice(0, need);
         const alone = q.length === 1;
-        if (near.length >= need || waited >= (alone ? BOT_WAIT_ALONE : BOT_WAIT_CROWD)) {
+        if (e.botWait == null) e.botWait = BOT_WAIT_ALONE[0] + Math.random() * (BOT_WAIT_ALONE[1] - BOT_WAIT_ALONE[0]);
+        if (near.length >= need || waited >= (alone ? e.botWait : BOT_WAIT_CROWD)) {
           for (const x of near) removeFromQueue(x);
           startMatch(e.game, e.md, near);
           continue;
@@ -141,7 +142,7 @@ function createRanked({ relay, store, publicDir }) {
       }
       for (const e of q) {
         const sec = Math.floor((now - e.t0) / 1000);
-        if (sec !== e.lastSec) { e.lastSec = sec; e.conn.send(JSON.stringify({ t: 'rq', st: 'wait', sec, n: q.length, bots: q.length === 1 ? BOT_WAIT_ALONE : BOT_WAIT_CROWD })); }
+        if (sec !== e.lastSec) { e.lastSec = sec; e.conn.send(JSON.stringify({ t: 'rq', st: 'wait', sec })); }
       }
     }
   }

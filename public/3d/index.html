@@ -379,7 +379,7 @@ a.back{text-decoration:none;display:inline-block}
     <section class="screen" id="s-ranked" hidden>
     <button class="back" data-go="home">← Back</button>
     <h2>Ranked</h2>
-    <p class="tag" style="margin:0">Win to climb from <b>Stardust</b> to <b>Singularity</b>. Beat stronger teams to climb faster. No real players around? You face bots built to play at your rank.</p>
+    <p class="tag" style="margin:0">Win to climb from <b>Stardust</b> to <b>Singularity</b>. Beat stronger teams to climb faster; losing to weaker ones costs more.</p>
     <div class="group"><label class="lbl" for="rkName">Your name</label><input type="text" id="rkName" maxlength="14" autocomplete="off" spellcheck="false"></div>
     <div class="group"><div class="lbl">Playlist</div><div class="rkmodes" id="rkModes"></div></div>
     <p class="note" id="rkNote" hidden></p>
@@ -1816,7 +1816,7 @@ function setGame(g){
   fx.parts.length=0;
   for(const t of trail){t.m.material.opacity=0}
 }
-function refreshLabels(){const g=app.game;if(!g)return;g.rings.forEach((r,i)=>{if(labelEls[i])labelEls[i].textContent=r.name+(r.bot&&app.mode==='online'?' · bot':'')})}
+function refreshLabels(){const g=app.game;if(!g)return;g.rings.forEach((r,i)=>{if(labelEls[i])labelEls[i].textContent=r.name+(r.bot&&app.mode==='online'&&!(Net.match&&Net.match.rk)?' · bot':'')})}
 
 /* ================= fx ================= */
 const fx={parts:[],banner:null,flash:0,lastCd:0};
@@ -2075,7 +2075,7 @@ function showEnd(){
   const tb=$('endStats');tb.textContent='';
   for(const r of g.rings.slice().sort((x,y)=>y.goals-x.goals||x.team-y.team)){
     const tr=document.createElement('tr'),td=document.createElement('td'),d=document.createElement('span');d.className='dot';d.style.background=COL[r.team];
-    td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':r.bot&&!app.game.free?' · '+STYLE_LABEL[styleOf(r.name)]:'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr);
+    td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':r.bot&&!app.game.free?' · bot':'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr);
   }
   const online=app.mode==='online',host=online&&Net.match&&Net.match.role==='host';
   $('againBtn').hidden=online&&!host;$('lobbyBtn').hidden=!(online&&host);$('againBtn').firstChild.textContent=online?'Rematch':'Play again';
@@ -2597,8 +2597,7 @@ function rkQueueText(){
   $('rkQTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
   if(RK.st==='found'){$('rkQText').textContent='Match found';$('rkQSub').textContent='Loading in…';return}
   $('rkQText').textContent='Searching';
-  const others=Math.max(0,(RK.q.n||1)-1),left=Math.max(0,(RK.q.bots||7)-s);
-  $('rkQSub').textContent=(others?`${others} other ${others===1?'player':'players'} searching ${RK.md}v${RK.md}. `:`Nobody else is searching ${RK.md}v${RK.md} right now. `)+(left>0?`Bots at your rank fill in after ${left}s.`:'Setting up bots at your rank…');
+  $('rkQSub').textContent=s<25?`Looking for players near your rank in ${RK.md}v${RK.md}…`:'Widening the search…';
 }
 function rkSend(){
   const me=RKS.identity(true);
@@ -2676,7 +2675,7 @@ function rkLobby(M,L2){
       const li=document.createElement('li'),b=document.createElement('span');b.className='rkbadge';
       const st=Array.isArray(L2.rs)?num(L2.rs[i],-1):-1;
       b.innerHTML=st>=0?RKS.icon(RKS.fromStep(st),26):'';
-      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2])+(s[3]===1&&typeof styleOf==='function'?' · '+STYLE_LABEL[styleOf(cleanName(s[2]))]:'');
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2]);
       li.append(b,nm);
       if(s[1]===me){const y=document.createElement('span');y.className='you';y.textContent='YOU';li.append(y)}
       ol.append(li);
