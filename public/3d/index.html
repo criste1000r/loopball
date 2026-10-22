@@ -568,15 +568,50 @@ const DIFF={
   elite:{spd:1,react:.045,dash:1,noise:6,shoot:800,air:.65}
 };
 // Bot skill runs 0..1; ranked bots get theirs from their rating. Rookie/Pro/Elite above stay as they were.
-function botParams(sk){sk=clamp(sk,0,1);const Li=(a,b)=>a+(b-a)*sk,S=(a,b)=>clamp((sk-a)/(b-a),0,1);
-  return{spd:Li(.7,1),react:Li(.34,.035),dash:Li(.25,1),noise:Li(70,4),shoot:Li(450,820),air:Li(.15,.8),
-    look:sk>=.4?.55:0,steer:sk>=.7?1:0,prune:600,lookP:sk>=.7?.25+.75*S(.7,1):.2+.8*S(.4,.7),lookEvery:sk>=.7?.12-.05*S(.7,1):.07}}
+function botParams(sk0){const sk=clamp(sk0,0,1),x=clamp((sk0-1)/.25,0,1),Li=(a,b)=>a+(b-a)*sk,S=(a,b)=>clamp((sk-a)/(b-a),0,1);
+  // above 1 (Quasar and Singularity bots): think more often, further ahead, over more options, and go for aerials
+  const P={iq:sk,spd:Li(.7,1),react:Li(.34,.035)-.012*x,dash:Li(.25,1),noise:Li(70,4)-2.5*x,shoot:Li(450,820),air:Li(.15,.8)+.15*x,
+    look:sk>=.4?.55+.1*x:0,steer:sk>=.7?1:0,prune:600,lookP:sk>=.7?.25+.75*S(.7,1):.2+.8*S(.4,.7),lookEvery:sk>=.7?.12-.05*S(.7,1)-.018*x:.07,
+    aerial:sk>=.85?1:0};
+  if(x>.3)P.angles=[0,-.3,.3,-.6,.6,-1.2,1.2];
+  return P}
+// Play styles: every bot is one of these, so bots feel like different people. A bot's name always has the same style.
+const STYLES={
+  ace:{},                                                                   // all-rounder
+  striker:{shootK:1.22,dashK:1.1,airK:1.2,wP:1.2,wD:.9},                  // shoots early and from range, keeps attacking
+  anchor:{shootK:.88,gs:1,wP:.9,wD:1.25,hold:.1},                           // patient: stays goal-side, waits for your mistake
+  bruiser:{bumpR:1.4,dashK:1.15,wB:1.6,hunt:1},                             // hunts bumps and steals
+  trickster:{feint:.5,hold:.3,airK:1.15,wP:1.05}                             // fakes one way and shoots the other, varies its timing
+};
+const STYLE_KEYS=Object.keys(STYLES);
+const STYLE_LABEL={ace:'All-rounder',striker:'Striker',anchor:'Anchor',bruiser:'Bruiser',trickster:'Trickster'};
+// the regular bots have fixed styles (an even mix); any other name gets one from a hash
+const STYLE_OF={"Vela":"ace","Kip":"striker","Moro":"anchor","Tuck":"bruiser","Rhee":"trickster","Sable":"ace","Quill":"striker","Juno":"anchor","Pike":"bruiser","Wren":"trickster","Ozzy":"ace","Lark":"striker","Nyx":"striker","orbitz":"bruiser","Kairo":"ace","zeph":"anchor","Mako":"trickster","lumen":"striker","Brixx":"bruiser","Sora":"ace","vanta":"anchor","Rook":"trickster","Ember":"striker","Pax":"bruiser","juno_k":"ace","Halcyon":"anchor","Tycho":"trickster","Vesper":"striker","Kestrel":"bruiser","Quinn":"ace","nova7":"anchor","Ash":"trickster","Calyx":"striker","drift":"bruiser","Okami":"ace","pixl":"anchor","Rune":"trickster","Selk":"striker","tidal":"bruiser","Umbra":"ace","Vex":"anchor","Wisp":"trickster"};
+function styleOf(name){name=String(name||'');if(STYLE_OF[name])return STYLE_OF[name];let h=2166136261;for(const c of name){h^=c.charCodeAt(0);h=Math.imul(h,16777619)>>>0}h^=h>>>15;h=Math.imul(h,2246822507)>>>0;h^=h>>>13;return STYLE_KEYS[h%STYLE_KEYS.length]}
+function styled(P0,style){
+  const S=STYLES[style]||{},P=Object.assign({},P0,{style});
+  // habits are strongest lower down; near the top, thinking ahead takes over and habits only tint it
+  const k=1-.65*clamp(((P0.iq||0)-.6)/.4,0,1),mix=(v,base)=>base+(v-base)*k;
+  if(S.shootK)P.shoot=P0.shoot*mix(S.shootK,1);
+  if(S.dashK)P.dash=Math.min(1,P0.dash*mix(S.dashK,1));
+  if(S.airK&&P0.air!=null)P.air=Math.min(1,P0.air*mix(S.airK,1));
+  for(const[key,base]of[['fdP',1],['wP',1],['wD',1],['wB',1],['bumpR',1],['feint',0],['hold',0]])if(S[key]!=null)P[key]=mix(S[key],base);
+  for(const key of['fr','fk','gs','hunt'])if(S[key]!=null)P[key]=S[key];
+  return P;
+}
+// the parameters a bot ring plays with: ranked bots carry their own; others come from the difficulty and their name
+function botP(r){
+  if(r.Pfix)return r.P;
+  const k=r.diff+'|'+r.name;
+  if(r.Pk!==k){r.Pk=k;r.P=styled(DIFF[r.diff]||DIFF.pro,styleOf(r.name))}
+  return r.P;
+}
 const KICK={1:[[-420,0]],2:[[-420,-190],[-650,210]],3:[[-420,0],[-620,-290],[-700,290]]};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const wrap=a=>{while(a>Math.PI)a-=6.283185307179586;while(a<-Math.PI)a+=6.283185307179586;return a};
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const num=(v,d=0)=>{v=Number(v);return Number.isFinite(v)?v:d};
-DIFF.legend=botParams(.82);  // look-ahead bot, about Supernova strength
+DIFF.legend=botParams(.92);  // look-ahead bot with aerials, about Supernova strength
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const store={get(k,d){try{const v=localStorage.getItem('loopball3d.'+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem('loopball3d.'+k,JSON.stringify(v))}catch{}}};
 function shuffled(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -929,6 +964,8 @@ function landing(o){
   return{x:clamp(o.x+o.vx*t,OR,L-OR),z:clamp(o.z+o.vz*t,OR,WD-OR),t};
 }
 function assignRoles(g,dt){
+  // everyone's inputs as the frame starts: every bot plans against the same picture, whatever order they think in
+  for(const r of g.rings){r.pix=r.ix;r.pi2=r.iz}
   g.roleT-=dt;if(g.roleT>0)return;g.roleT=.35;
   const o=g.orb;
   for(const t of[0,1]){
@@ -954,7 +991,7 @@ function simClone(g,r,prune){
   const o=g.orb;c.rings=[];c.byI=[];
   for(const q of g.rings){
     if(prune&&q!==r&&Math.hypot(q.x-r.x,q.z-r.z)>prune&&Math.hypot(q.x-o.x,q.z-o.z)>prune)continue;
-    const k=Object.assign({},q);k.ai=null;k.dashReq=false;k.hopReq=false;c.rings.push(k);c.byI[q.i]=k;
+    const k=Object.assign({},q);k.ai=null;k.dashReq=false;k.hopReq=false;if(q!==r&&q.pix!==undefined){k.ix=q.pix;k.iz=q.pi2}c.rings.push(k);c.byI[q.i]=k;
   }
   c.orb=Object.assign({},o);
   c.scored=function(team){this.lastGoal={team};this.phase='goal'};
@@ -963,15 +1000,18 @@ function simClone(g,r,prune){
 function simValue(g,r,act,T,P){
   const c=simClone(g,r,P&&P.prune),me=c.byI[r.i],foe=goalOf(1-r.team),own=goalOf(r.team),dt=STEP*((P&&P.ss)||(g.size>1?2:1));
   if(act&1)me.dashReq=true;if(act&2)me.hopReq=true;
+  const dk=act&4?Math.round(.14/(STEP*((P&&P.ss)||(g.size>1?2:1)))):-1;   // hop now, dash a moment later (aerial)
   let v=0;const n=Math.round(T/dt);
   for(let k=0;k<n;k++){
+    if(k===dk)me.dashReq=true;
     c.step(dt);
     if(c.phase==='goal'){const t=c.lastGoal.team;return(t===r.team?1000:-1000)*(1-k/n*.3)}
-    for(const e of c.events)if(e.type==='bump'){if(c.byI[e.i].team===r.team)v+=c.byI[e.v].carry||e.v===g.carrier?160:60;else v-=e.v===r.i&&r.carry?200:90}
+    for(const e of c.events)if(e.type==='bump'){if(c.byI[e.i].team===r.team)v+=(c.byI[e.v].carry||e.v===g.carrier?160:60)*((P&&P.wB)||1);else v-=e.v===r.i&&r.carry?200:90}
     c.events.length=0;
   }
   const o=c.orb;
-  v+=(Math.abs(own.x-o.x)-Math.abs(foe.x-o.x))*.1;
+  const wP=(P&&P.wP)||1,wD=(P&&P.wD)||1;
+  v+=.1*(wP*(L/2-Math.abs(foe.x-o.x))-wD*(L/2-Math.abs(own.x-o.x)));
   if(c.carrier>=0)v+=c.byI[c.carrier].team===r.team?140:-140;
   const gdx=foe.x-o.x;
   if(Math.abs(o.vx)>250&&Math.sign(o.vx)===Math.sign(gdx)){const tt=Math.abs(gdx/o.vx),z=o.z+o.vz*tt;if(tt<1.2&&Math.abs(z-WD/2)<MOUTH/2&&o.y<GH+20)v+=220*(1.2-tt)}
@@ -996,16 +1036,17 @@ function lookAct(g,r,P,full){
   for(const da of P.angles||[0,-.6,.6,-1.2,1.2]){
     const a=base+da;r.ix=Math.cos(a);r.iz=Math.sin(a);
     const acts=[0];if(canD&&Math.abs(da)<=(P.dashSpread==null?(g.size>1?.7:9):P.dashSpread))acts.push(1);if(canH&&da===0)acts.push(2);
+    if(P.aerial&&canD&&r.ground&&da===0&&Math.hypot(o.x-r.x,o.z-r.z)<330&&o.y>OR+30)acts.push(6);
     for(const act of acts){
-      const v=simValue(g,r,act,T,P)-(act&1?cost:0)-(act&2?20:0)-Math.abs(da)*12;
+      const v=simValue(g,r,act,T,P)-(act&1?cost:0)-(act&4?cost:0)-(act&2?20:0)-Math.abs(da)*12;
       if(v>bv){bv=v;best=[a,act]}
     }
   }
   r.ix=save[0];r.iz=save[1];
-  ai.sa=best[0];ai.saT=(P.lookEvery||.08)*1.6;ai.dash=!!(best[1]&1);if(best[1]&2)ai.hop=true;
+  ai.sa=best[0];ai.saT=(P.lookEvery||.08)*1.6;ai.dash=!!(best[1]&1);if(best[1]&2)ai.hop=true;if(best[1]&4)ai.combo=.14;
 }
 function botControl(g,r,dt){
-  const P=r.P||DIFF[r.diff]||DIFF.pro,ai=r.ai;
+  const P=botP(r),ai=r.ai;
   ai.t-=dt;
   if(ai.combo>0){ai.combo-=dt;if(ai.combo<=0)r.dashReq=true}
   if(ai.t<=0){ai.t=P.react*(.7+Math.random()*.6);botDecide(g,r,P)}
@@ -1027,6 +1068,9 @@ function botDecide(g,r,P){
   let tx,tz;
   if(g.phase==='cd'){ai.tx=r.x;ai.tz=r.z;ai.face=angTo(o.x,o.z);return}
   const hd=Math.hypot(o.x-r.x,o.z-r.z);
+  // like a person, the score matters: chase the game when behind late on, protect a lead
+  const diff=g.score[r.team]-g.score[1-r.team],late=!g.ot&&!g.free&&g.time<50;
+  const push=late&&diff<0?1:late&&diff>0?-1:0,SH=P.shoot*(push>0?1.15:push<0?.9:1);
   // air play: hop to meet a low flying orb that is close
   if(!car&&o.y>OR+22&&o.y<HB+190&&hd<RO+70&&Math.random()<P.air){
     if(r.ground&&o.y<HB+110)ai.hop=true;
@@ -1034,8 +1078,10 @@ function botDecide(g,r,P){
     if(!r.ground&&r.ch>=1&&Math.cos(r.f-angTo(o.x,o.z))>.8&&Math.abs(o.y-(r.y+HB/2))<40&&Math.random()<P.dash)ai.dash=true;
   }
   if(car===r){
-    if(ai.aimZ==null)ai.aimZ=WD/2+rnd(-.25,.25)*MOUTH;
+    if(ai.aimZ==null){ai.aimZ=WD/2+rnd(-.25,.25)*MOUTH;ai.fe=!!P.feint&&Math.random()<P.feint}
     let dx=foe.x-r.x,dz=ai.aimZ-r.z;const d=Math.hypot(dx,dz);dx/=d;dz/=d;
+    // feint: lean to one post, then cut to the other as the shot gets close
+    if(ai.fe&&d<SH*1.15){ai.fe=false;ai.aimZ=WD-ai.aimZ}
     let sx=0,sz=0,threat=1e9;
     for(const q of g.rings){
       if(q.team===r.team||q.stun>0)continue;
@@ -1045,7 +1091,7 @@ function botDecide(g,r,P){
     tx=r.x+(dx+sx*.9)*220;tz=r.z+(dz+sz*.9)*220;ai.urgent=true;
     const al=Math.cos(r.f-Math.atan2(dz,dx));
     if(r.ch>=1&&r.ground&&threat<230&&threat>110&&al>.85&&P.air>.6&&Math.random()<.25*P.air&&!(ai.combo>0)){ai.hop=true;ai.combo=.14}
-    else if(r.ch>=1&&((d<P.shoot&&al>.93)||(threat<130&&al>.55&&d<1100))&&Math.random()<P.dash+.2)ai.dash=true;
+    else if(r.ch>=1&&((d<SH&&al>.93&&!(P.hold&&d>300&&Math.random()<P.hold))||(threat<130&&al>.55&&d<1100))&&Math.random()<P.dash+.2)ai.dash=true;
   }else{
     ai.aimZ=null;
     if(car&&car.team===r.team){
@@ -1054,13 +1100,25 @@ function botDecide(g,r,P){
     }else if(car){
       const d=Math.hypot(car.x-r.x,car.z-r.z);
       if(r.role==='att'||d<300||g.size===1){
-        tx=car.x+car.vx*.25;tz=car.z+car.vz*.25;ai.urgent=true;
-        if(d<210&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.z))>.85&&Math.random()<P.dash)ai.dash=true;
+        const gx=own.x-car.x,gz=own.z-car.z,gl=Math.hypot(gx,gz)||1,goalSide=((r.x-car.x)*gx+(r.z-car.z)*gz)/gl>20;
+        // anchors (and anyone protecting a late lead) get between the carrier and goal first
+        if((P.gs||push<0)&&!goalSide&&d>120){const k=Math.min(gl*.5,190);tx=car.x+gx/gl*k;tz=car.z+gz/gl*k}
+        else{tx=car.x+car.vx*.25;tz=car.z+car.vz*.25}
+        ai.urgent=true;
+        if(d<210*(P.bumpR||1)&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.z))>.85&&Math.random()<P.dash)ai.dash=true;
       }else{tx=own.x+(car.x-own.x)*.3;tz=own.z+(car.z-own.z)*.3;ai.face=angTo(car.x,car.z)}
     }else{
       const ld=landing(o);
       const oDist=Math.hypot(ld.x-own.x,ld.z-own.z);
       const go=r.role==='att'||g.size===1||(r.role==='def'&&oDist<420);
+      // bruisers knock a rival off the loose orb before it's theirs
+      if(go&&P.hunt&&r.ch>=1){
+        for(const q of g.rings){
+          if(q.team===r.team||q.stun>0)continue;
+          const qd=Math.hypot(q.x-r.x,q.z-r.z);
+          if(qd<210*(P.bumpR||1)&&Math.hypot(o.x-q.x,o.z-q.z)<170&&Math.cos(r.f-angTo(q.x+q.vx*.15,q.z+q.vz*.15))>.9&&Math.random()<P.dash){ai.dash=true;break}
+        }
+      }
       if(go){
         const air=ld.t>.25;
         const t=air?ld.t:clamp(hd/800,0,.6);
@@ -1071,7 +1129,7 @@ function botDecide(g,r,P){
         ai.urgent=true;
         if(along>.35||dd<80){
           tx=px+ax*25;tz=pz+az*25;
-          const nearGoal=Math.hypot(foe.x-px,foe.z-pz)<P.shoot+150;
+          const nearGoal=Math.hypot(foe.x-px,foe.z-pz)<SH+150;
           if(r.ch>=1&&dd<150&&!air&&nearGoal&&Math.cos(r.f-Math.atan2(toZ,toX))>.9&&Math.random()<P.dash*.5)ai.dash=true;
           if(r.ch>=2&&dd>300&&dd<600&&along>.8&&Math.random()<P.dash*.15)ai.dash=true;
         }else{
@@ -2017,7 +2075,7 @@ function showEnd(){
   const tb=$('endStats');tb.textContent='';
   for(const r of g.rings.slice().sort((x,y)=>y.goals-x.goals||x.team-y.team)){
     const tr=document.createElement('tr'),td=document.createElement('td'),d=document.createElement('span');d.className='dot';d.style.background=COL[r.team];
-    td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr);
+    td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':r.bot&&!app.game.free?' · '+STYLE_LABEL[styleOf(r.name)]:'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr);
   }
   const online=app.mode==='online',host=online&&Net.match&&Net.match.role==='host';
   $('againBtn').hidden=online&&!host;$('lobbyBtn').hidden=!(online&&host);$('againBtn').firstChild.textContent=online?'Rematch':'Play again';
@@ -2618,7 +2676,7 @@ function rkLobby(M,L2){
       const li=document.createElement('li'),b=document.createElement('span');b.className='rkbadge';
       const st=Array.isArray(L2.rs)?num(L2.rs[i],-1):-1;
       b.innerHTML=st>=0?RKS.icon(RKS.fromStep(st),26):'';
-      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2]);
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2])+(s[3]===1&&typeof styleOf==='function'?' · '+STYLE_LABEL[styleOf(cleanName(s[2]))]:'');
       li.append(b,nm);
       if(s[1]===me){const y=document.createElement('span');y.className='you';y.textContent='YOU';li.append(y)}
       ol.append(li);

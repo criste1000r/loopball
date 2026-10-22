@@ -31,6 +31,8 @@ function loadEngine(file) {
 return {Game, assignRoles, botControl, num, clamp, RI, OR,
   HB: typeof HB === 'undefined' ? 0 : HB,
   botParams: typeof botParams === 'function' ? botParams : null,
+  styled: typeof styled === 'function' ? styled : null,
+  styleOf: typeof styleOf === 'function' ? styleOf : null,
   DIFF: typeof DIFF === 'undefined' ? null : DIFF};`);
   const api = make(stubs.matchMedia, stubs.localStorage, stubs.performance);
   return api;
@@ -80,9 +82,14 @@ function createRanked({ relay, store, publicDir }) {
   }
   function modeOf(p, k) { return p.m[k] || (p.m[k] = blankMode()); }
   function botSkill(mmr) { return R.botSkill(mmr); }
-  function botParamsFor(eng, mmr) {
-    const sk = botSkill(mmr);
-    if (eng.botParams) return { P: eng.botParams(sk), diff: 'pro' };
+  // each bot plays its name's style (so regulars feel familiar) with a little match-to-match form
+  function botParamsFor(eng, mmr, name) {
+    const sk = botSkill(mmr) + (Math.random() - .5) * .05;
+    if (eng.botParams) {
+      let P = eng.botParams(sk);
+      if (eng.styled && eng.styleOf) P = eng.styled(P, eng.styleOf(name));
+      return { P, diff: 'pro' };
+    }
     return { P: null, diff: sk < .33 ? 'rookie' : sk < .62 ? 'pro' : 'elite' };
   }
 
@@ -199,7 +206,7 @@ function createRanked({ relay, store, publicDir }) {
     let b = 0;
     M.g.rings.forEach((r, i) => {
       const s = M.slots[i];
-      if (s.bot) { const bp = botParamsFor(eng, M.bots[b++].mmr); if (bp.P) { r.P0 = bp.P; r.P = liteP(bp.P); } r.diff = bp.diff; }
+      if (s.bot) { const bp = botParamsFor(eng, M.bots[b++].mmr, s.name); if (bp.P) { r.P0 = bp.P; r.P = liteP(bp.P); r.Pfix = true; } r.diff = bp.diff; }
       else { const h = M.humans.find(x => x.peer === s.peer); h.slot = i; h.ring = r; r.peer = h.peer; }
     });
     for (const h of M.humans) if (h.missing >= JOIN_WAIT - .01 && !h.here) toBot(M, h, false);
@@ -208,8 +215,8 @@ function createRanked({ relay, store, publicDir }) {
   }
   function toBot(M, h, penalize) {
     const r = M.g.rings[h.slot];
-    const bp = botParamsFor(M.eng, h.mmr);
-    r.bot = true; r.peer = null; if (bp.P) { r.P0 = bp.P; r.P = liteP(bp.P); } r.diff = bp.diff; r.ai = { t: 0 };
+    const bp = botParamsFor(M.eng, h.mmr, h.name);
+    r.bot = true; r.peer = null; if (bp.P) { r.P0 = bp.P; r.P = liteP(bp.P); r.Pfix = true; } r.diff = bp.diff; r.ai = { t: 0 };
     h.gone = true;
     if (penalize) settle(M, h, false, true);
     else { h.done = true; if (byPid.get(h.pid) && byPid.get(h.pid).match === M) byPid.delete(h.pid); }

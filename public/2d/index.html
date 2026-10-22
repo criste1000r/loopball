@@ -555,10 +555,43 @@ const CREASE=190; // goal-zone radius
 const COL=['#3a62ff','#ff7536'],COL_SOFT=['#a9bbff','#ffc3a6'],TNAME=['Blue','Orange'];
 const BOTNAMES=['Vela','Kip','Moro','Tuck','Rhee','Sable','Quill','Juno','Pike','Wren','Ozzy','Lark'];
 // Bot skill runs 0..1; ranked bots get theirs from their rating
-function botParams(sk){sk=clamp(sk,0,1);const L=(a,b)=>a+(b-a)*sk,S=(a,b)=>clamp((sk-a)/(b-a),0,1);
-  // the top of the ladder thinks ahead: first about when to dash, then about where to steer too
-  return{spd:L(.7,1),react:L(.34,.03),dash:L(.25,1),noise:L(70,3),shoot:L(420,700),iq:sk,hes:L(.14,0),
-    look:sk>=.4?.6:0,steer:sk>=.7?1:0,prune:600,lookP:sk>=.7?.25+.75*S(.7,1):.2+.8*S(.4,.7),lookEvery:sk>=.7?.12-.06*S(.7,1):.06}}
+function botParams(sk0){const sk=clamp(sk0,0,1),x=clamp((sk0-1)/.25,0,1),L=(a,b)=>a+(b-a)*sk,S=(a,b)=>clamp((sk-a)/(b-a),0,1);
+  // the top of the ladder thinks ahead: first about when to dash, then about where to steer too;
+  // above 1 (Quasar and Singularity bots) it thinks more often, further ahead and over more options
+  const P={spd:L(.7,1),react:L(.34,.03)-.01*x,dash:L(.25,1),noise:L(70,3)-2*x,shoot:L(420,700),iq:sk,hes:L(.14,0),
+    look:sk>=.4?.6+.08*x:0,steer:sk>=.7?1:0,prune:600,lookP:sk>=.7?.25+.75*S(.7,1):.2+.8*S(.4,.7),lookEvery:sk>=.7?.12-.06*S(.7,1)-.018*x:.06};
+  if(x>.3)P.angles=[0,-.3,.3,-.6,.6,-1.2,1.2];
+  return P}
+// Play styles: every bot is one of these, so bots feel like different people. A bot's name always has the same style.
+const STYLES={
+  ace:{},                                                              // all-rounder
+  striker:{shootK:1.25,dashK:1.1,fdP:.5,fr:0,fk:0,wP:1.2,wD:.9},      // shoots early and from range, keeps attacking
+  anchor:{shootK:.88,fdP:1,wP:.9,wD:1.25,hold:.1},                     // patient: stays goal-side, keeps a dash, waits for your mistake
+  bruiser:{bumpR:1.4,dashK:1.15,wB:1.6,hunt:1,fdP:.8},                 // hunts bumps and steals
+  trickster:{feint:.45,hold:.3,wP:1.05}                                // fakes one way and shoots the other, varies its timing
+};
+const STYLE_KEYS=Object.keys(STYLES);
+const STYLE_LABEL={ace:'All-rounder',striker:'Striker',anchor:'Anchor',bruiser:'Bruiser',trickster:'Trickster'};
+// the regular bots have fixed styles (an even mix); any other name gets one from a hash
+const STYLE_OF={"Vela":"ace","Kip":"striker","Moro":"anchor","Tuck":"bruiser","Rhee":"trickster","Sable":"ace","Quill":"striker","Juno":"anchor","Pike":"bruiser","Wren":"trickster","Ozzy":"ace","Lark":"striker","Nyx":"striker","orbitz":"bruiser","Kairo":"ace","zeph":"anchor","Mako":"trickster","lumen":"striker","Brixx":"bruiser","Sora":"ace","vanta":"anchor","Rook":"trickster","Ember":"striker","Pax":"bruiser","juno_k":"ace","Halcyon":"anchor","Tycho":"trickster","Vesper":"striker","Kestrel":"bruiser","Quinn":"ace","nova7":"anchor","Ash":"trickster","Calyx":"striker","drift":"bruiser","Okami":"ace","pixl":"anchor","Rune":"trickster","Selk":"striker","tidal":"bruiser","Umbra":"ace","Vex":"anchor","Wisp":"trickster"};
+function styleOf(name){name=String(name||'');if(STYLE_OF[name])return STYLE_OF[name];let h=2166136261;for(const c of name){h^=c.charCodeAt(0);h=Math.imul(h,16777619)>>>0}h^=h>>>15;h=Math.imul(h,2246822507)>>>0;h^=h>>>13;return STYLE_KEYS[h%STYLE_KEYS.length]}
+function styled(P0,style){
+  const S=STYLES[style]||{},P=Object.assign({},P0,{style});
+  // habits are strongest lower down; near the top, thinking ahead takes over and habits only tint it
+  const k=1-.65*clamp(((P0.iq||0)-.6)/.4,0,1),mix=(v,base)=>base+(v-base)*k;
+  if(S.shootK)P.shoot=P0.shoot*mix(S.shootK,1);
+  if(S.dashK)P.dash=Math.min(1,P0.dash*mix(S.dashK,1));
+  for(const[key,base]of[['fdP',1],['wP',1],['wD',1],['wB',1],['bumpR',1],['feint',0],['hold',0]])if(S[key]!=null)P[key]=mix(S[key],base);
+  for(const key of['fr','fk','gs','hunt'])if(S[key]!=null)P[key]=S[key];
+  return P;
+}
+// the parameters a bot ring plays with: ranked bots carry their own; others come from the difficulty and their name
+function botP(r){
+  if(r.Pfix)return r.P;
+  const k=r.diff+'|'+r.name;
+  if(r.Pk!==k){r.Pk=k;r.P=styled(DIFF[r.diff]||DIFF.pro,styleOf(r.name))}
+  return r.P;
+}
 const KICK={1:[[-330,0]],2:[[-330,-150],[-520,170]],3:[[-330,0],[-500,-230],[-560,230]]};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const wrap=a=>{while(a>Math.PI)a-=6.283185307179586;while(a<-Math.PI)a+=6.283185307179586;return a};
@@ -875,6 +908,8 @@ function replayView(g){
 /* ================= bots ================= */
 function goalOf(t){return t===0?{x:0,y:H/2}:{x:W,y:H/2}}
 function assignRoles(g,dt){
+  // everyone's inputs as the frame starts: every bot plans against the same picture, whatever order they think in
+  for(const r of g.rings){r.pix=r.ix;r.pi2=r.iy}
   g.roleT-=dt;if(g.roleT>0)return;g.roleT=.35;
   const o=g.orb;
   for(const t of[0,1]){
@@ -892,7 +927,7 @@ function assignRoles(g,dt){
   }
 }
 function botControl(g,r,dt){
-  const P=r.P||DIFF[r.diff]||DIFF.pro,ai=r.ai;
+  const P=botP(r),ai=r.ai;
   ai.t-=dt;if(ai.slow>0)ai.slow-=dt;
   if(ai.t<=0){ai.t=P.react*(.7+Math.random()*.6);botDecide(g,r,P);if(Math.random()<P.hes)ai.slow=rnd(.15,.45)}
   if(ai.tx==null){r.ix=r.iy=0;return}
@@ -917,7 +952,7 @@ function simClone(g,r,prune){
   c.rings=[];c.byI=[];
   for(const q of g.rings){
     if(prune&&q!==r&&Math.hypot(q.x-r.x,q.y-r.y)>prune&&Math.hypot(q.x-o.x,q.y-o.y)>prune)continue;
-    const k={i:q.i,team:q.team,x:q.x,y:q.y,vx:q.vx,vy:q.vy,f:q.f,w:q.w,ix:q.ix,iy:q.iy,dashReq:false,ch:q.ch,chT:q.chT,cd:q.cd,dashT:q.dashT,stun:q.stun,carry:q.carry};
+    const k={i:q.i,team:q.team,x:q.x,y:q.y,vx:q.vx,vy:q.vy,f:q.f,w:q.w,ix:q===r||q.pix===undefined?q.ix:q.pix,iy:q===r||q.pi2===undefined?q.iy:q.pi2,dashReq:false,ch:q.ch,chT:q.chT,cd:q.cd,dashT:q.dashT,stun:q.stun,carry:q.carry};
     c.rings.push(k);c.byI[q.i]=k;
   }
   c.orb={x:o.x,y:o.y,vx:o.vx,vy:o.vy,last:o.last,trail:[]};
@@ -931,11 +966,11 @@ function simValue(g,r,dash,T,P){
   for(let k=0;k<n;k++){
     c.step(dt);
     if(c.phase==='goal'){const t=c.lastGoal.team;return (t===r.team?1000:-1000)*(1-k/n*.3)}
-    for(const e of c.events)if(e.type==='bump'){if(c.byI[e.i].team===r.team)v+=e.v===g.carrier||c.byI[e.v].carry?160:60;else v-=e.v===r.i&&r.carry?200:90}
+    for(const e of c.events)if(e.type==='bump'){if(c.byI[e.i].team===r.team)v+=(e.v===g.carrier||c.byI[e.v].carry?160:60)*((P&&P.wB)||1);else v-=e.v===r.i&&r.carry?200:90}
     c.events.length=0;
   }
-  const o=c.orb;
-  v+=(Math.abs(own.x-o.x)-Math.abs(foe.x-o.x))*.12;
+  const o=c.orb,wP=(P&&P.wP)||1,wD=(P&&P.wD)||1;
+  v+=.12*(wP*(W/2-Math.abs(foe.x-o.x))-wD*(W/2-Math.abs(own.x-o.x)));
   if(c.carrier>=0)v+=c.byI[c.carrier].team===r.team?140:-140;
   const sp=Math.hypot(o.vx,o.vy),gdx=foe.x-o.x;
   if(sp>300&&Math.sign(o.vx)===Math.sign(gdx)){const tt=Math.abs(gdx/o.vx),y=o.y+o.vy*tt;if(tt<1.2&&Math.abs(y-H/2)<MOUTH/2)v+=220*(1.2-tt)}
@@ -982,6 +1017,10 @@ function botDecide(g,r,P){
   let tx,ty;
   const angTo=(x,y)=>Math.atan2(y-r.y,x-r.x);
   if(g.phase==='cd'){ai.tx=r.x;ai.ty=r.y;ai.face=angTo(o.x,o.y);return}
+  // like a person, the score matters: chase the game when behind late on, protect a lead
+  const diff=g.score[r.team]-g.score[1-r.team],late=!g.ot&&!g.free&&g.time<50;
+  const push=late&&diff<0?1:late&&diff>0?-1:0;
+  const SH=P.shoot*(push>0?1.15:push<0?.9:1),fdP=push>0?(P.fdP==null?1:P.fdP)*.55:push<0?1:(P.fdP==null?1:P.fdP);
   // save: a shot is flying at our goal, get in front of it
   if(smart&&P.fs!==0&&car!==r&&!(car&&car.team===r.team)){
     const sp=Math.hypot(o.vx,o.vy),gdx=own.x-o.x;
@@ -998,7 +1037,12 @@ function botDecide(g,r,P){
   }
   if(car===r){
     ai.aimT=(ai.aimT||0)-P.react;
-    if(ai.aimY==null||(smart&&P.fa!==0&&ai.aimT<=0)){ai.aimY=smart&&P.fa!==0?bestAim(g,r,foe):H/2+rnd(-.25,.25)*MOUTH;ai.aimT=.35}
+    if(ai.aimY==null||(smart&&P.fa!==0&&ai.aimT<=0)){
+      ai.aimY=smart&&P.fa!==0?bestAim(g,r,foe):H/2+rnd(-.25,.25)*MOUTH;ai.aimT=.35;
+      // feint: show the other post first, then cut back
+      const fd0=Math.hypot(foe.x-r.x,foe.y-r.y);
+      if(P.feint&&fd0<SH*1.6&&fd0>SH*.7&&Math.random()<P.feint){ai.aimY=H-ai.aimY;ai.aimT=rnd(.18,.4)}
+    }
     let dx=foe.x-r.x,dy=ai.aimY-r.y;const d=Math.hypot(dx,dy);dx/=d;dy/=d;
     let sx=0,sy=0,threat=1e9;
     for(const q of g.rings){
@@ -1009,7 +1053,9 @@ function botDecide(g,r,P){
     tx=r.x+(dx+sx*.9)*200;ty=r.y+(dy+sy*.9)*200;ai.urgent=true;
     const al=Math.cos(r.f-Math.atan2(dy,dx));
     const open=smart&&P.fa!==0?laneOpen(g,r.team,o.x,o.y,foe.x,ai.aimY):1e9;
-    let goodShot=d<P.shoot&&al>.93&&(open>RO+OR-4||d<230);
+    let goodShot=d<SH&&al>.93&&(open>RO+OR-4||d<230);
+    // some players wait a beat for a better look; it makes the timing harder to read
+    if(goodShot&&P.hold&&d>260&&Math.random()<P.hold)goodShot=false;
     let panic=threat<120&&al>.55&&d<950;
     if(smart&&P.fp===1){
       // someone is lining up a dash at us: shoot now if it is decent, otherwise slip sideways
@@ -1032,17 +1078,17 @@ function botDecide(g,r,P){
     }else if(car){
       const d=Math.hypot(car.x-r.x,car.y-r.y);
       if(r.role==='att'||d<260||g.size===1){
-        if(smart&&P.fd!==0){
+        if(smart&&P.fd!==0&&Math.random()<fdP){
           // stay between the carrier and our goal, then strike when lined up
           const gx=own.x-car.x,gy=own.y-car.y,gl=Math.hypot(gx,gy)||1;
           const goalSide=((r.x-car.x)*gx+(r.y-car.y)*gy)/gl>20;
           if(!goalSide&&d>110){const k=Math.min(gl*.5,170);tx=car.x+gx/gl*k;ty=car.y+gy/gl*k}
           else if(P.fg===1&&gl<W*.5&&d>150){tx=own.x+(car.x-own.x)*.35;ty=own.y+(car.y-own.y)*.35;ai.face=angTo(car.x,car.y)}
           else{tx=car.x+car.vx*.18;ty=car.y+car.vy*.18}
-          if(d<175&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.88&&Math.random()<P.dash)ai.dash=true;
+          if(d<175*(P.bumpR||1)&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.88&&Math.random()<P.dash)ai.dash=true;
         }else{
           tx=car.x+car.vx*.25;ty=car.y+car.vy*.25;
-          if(d<190&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.85&&Math.random()<P.dash)ai.dash=true;
+          if(d<190*(P.bumpR||1)&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.85&&Math.random()<P.dash)ai.dash=true;
         }
         ai.urgent=true;
       }else{tx=own.x+(car.x-own.x)*.3;ty=own.y+(car.y-own.y)*.3;ai.face=angTo(car.x,car.y)}
@@ -1055,6 +1101,14 @@ function botDecide(g,r,P){
         let od=1e9;for(const q of g.rings)if(q.team!==r.team&&q.stun<=0)od=Math.min(od,Math.hypot(o.x-q.x,o.y-q.y));
         if(od<dd0*.6){go=false;tx=own.x+(o.x-own.x)*.3;ty=own.y+(o.y-own.y)*.3;ai.face=angTo(o.x,o.y);ai.urgent=true}
       }
+      // bruisers knock a rival off the loose orb before it's theirs
+      if(go&&P.hunt&&r.ch>=1){
+        for(const q of g.rings){
+          if(q.team===r.team||q.stun>0)continue;
+          const qd=Math.hypot(q.x-r.x,q.y-r.y);
+          if(qd<190*(P.bumpR||1)&&Math.hypot(o.x-q.x,o.y-q.y)<150&&Math.cos(r.f-angTo(q.x+q.vx*.15,q.y+q.vy*.15))>.9&&Math.random()<P.dash){ai.dash=true;break}
+        }
+      }
       if(go){
         const t=clamp(dd0/700,0,.6);
         const px=clamp(o.x+o.vx*t,OR,W-OR),py=clamp(o.y+o.vy*t,OR,H-OR);
@@ -1064,7 +1118,7 @@ function botDecide(g,r,P){
         ai.urgent=true;
         if(along>.35||dd<70){
           tx=px+ax*25;ty=py+ay*25;
-          const nearGoal=Math.hypot(foe.x-px,foe.y-py)<P.shoot+150;
+          const nearGoal=Math.hypot(foe.x-px,foe.y-py)<SH+150;
           const keep=smart&&P.fk!==0&&r.ch<2&&!nearGoal;
           if(smart&&P.fko===1&&r.ch>=1&&Math.hypot(o.vx,o.vy)<30&&Math.abs(o.x-W/2)<6&&Math.abs(o.y-H/2)<6&&dd>150&&dd<330&&Math.cos(r.f-Math.atan2(toY,toX))>.95)ai.dash=true;
           if(!keep&&r.ch>=1&&dd<130&&nearGoal&&Math.cos(r.f-Math.atan2(toY,toX))>.9&&Math.random()<P.dash*.5)ai.dash=true;
@@ -1892,7 +1946,7 @@ function showEnd(){
   $('endA').textContent=a;$('endB').textContent=b;
   const tb=$('endStats');tb.textContent='';
   const rows=g.rings.slice().sort((x,y)=>y.goals-x.goals||x.team-y.team);
-  for(const r of rows){const tr=document.createElement('tr');const td=document.createElement('td');const d=document.createElement('span');d.className='dot';d.style.background=COL[r.team];td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr)}
+  for(const r of rows){const tr=document.createElement('tr');const td=document.createElement('td');const d=document.createElement('span');d.className='dot';d.style.background=COL[r.team];td.append(d,document.createTextNode(r.name+(r.i===app.mySlot?' (you)':r.bot&&!app.game.free?' · '+STYLE_LABEL[styleOf(r.name)]:'')));const td2=document.createElement('td');td2.textContent=r.goals+(r.goals===1?' goal':' goals');tr.append(td,td2);tb.append(tr)}
   const online=app.mode==='online',host=online&&Net.match&&Net.match.role==='host';
   $('againBtn').hidden=online&&!host;$('lobbyBtn').hidden=!(online&&host);$('againBtn').firstChild.textContent=online?'Rematch':'Play again';
   $('endQuit').firstChild.textContent=online?'Leave match':'Menu';
@@ -2492,7 +2546,7 @@ function rkLobby(M,L2){
       const li=document.createElement('li'),b=document.createElement('span');b.className='rkbadge';
       const st=Array.isArray(L2.rs)?num(L2.rs[i],-1):-1;
       b.innerHTML=st>=0?RKS.icon(RKS.fromStep(st),26):'';
-      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2]);
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2])+(s[3]===1&&typeof styleOf==='function'?' · '+STYLE_LABEL[styleOf(cleanName(s[2]))]:'');
       li.append(b,nm);
       if(s[1]===me){const y=document.createElement('span');y.className='you';y.textContent='YOU';li.append(y)}
       ol.append(li);

@@ -46,13 +46,14 @@
     return Math.round(K * ((won ? 1 : 0) - expected(mine, theirs)));
   }
   // ranked bots: skill 0..1 from rating (Stardust bots are gentle, Singularity bots are ruthless).
-  // Calibrated from bot-vs-bot series: the old "Elite" bot plays like about 1250 (Planet II);
-  // from Supernova up the bots think ahead about every dash and turn.
-  const SK = [[500, 0], [900, .25], [1300, .5], [1600, .65], [1950, .82], [2075, .88], [2275, .95], [2475, 1]];
+  // Calibrated from bot-vs-bot series: the old "Elite" bot plays like about 1250 (Planet II).
+  // From Pulsar up the bots think ahead about every dash and turn; Quasar and Singularity bots go
+  // past 1, thinking further ahead and more often (and, in 3D, going for aerials).
+  const SK = [[500, 0], [900, .25], [1300, .5], [1600, .65], [1950, .84], [2075, .93], [2275, 1.06], [2475, 1.2], [2800, 1.25]];
   function botSkill(mmr) {
     if (mmr <= SK[0][0]) return 0;
     for (let i = 1; i < SK.length; i++) if (mmr <= SK[i][0]) { const a = SK[i - 1], b = SK[i]; return a[1] + (b[1] - a[1]) * (mmr - a[0]) / (b[0] - a[0]); }
-    return 1;
+    return SK[SK.length - 1][1];
   }
 
   /* ---------- badges: inline SVG, one look per tier ---------- */

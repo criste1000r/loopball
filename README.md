@@ -29,6 +29,9 @@ on another device.
 - Ranks: Stardust, Comet, Moon, Planet, Star, Nova and Pulsar (three divisions each), then Supernova, Quasar
   and Singularity. The top three have no divisions, and the bots there think ahead about every dash and turn.
 - If nobody else is searching, bots of your rank fill the match after a few seconds.
+- Bots have play styles that stay with their names: all-rounders, strikers who shoot early, anchors who
+  stay goal-side and wait for your mistake, bruisers who hunt bumps, and tricksters who fake and vary their timing.
+  They also react to the score: pressing when behind late, protecting a lead.
 - The main page has the leaderboards (top 100 per game and playlist).
 
 ### Keep ranks safe with Neon (free)
