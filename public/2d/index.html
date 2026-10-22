@@ -1473,6 +1473,7 @@ function hostFrame(dt){
     if(r.local){applyLocalInput(r);continue}
     if(r.bot)continue;
     const p=pm.get(r.peer),inp=p&&p.presence&&p.presence.in;
+    if(p&&p.presence&&Array.isArray(p.presence.cl))hostClaimFrom(M,g,r,p.presence.cl);
     if(Array.isArray(inp)){
       r.ix=clamp(num(inp[0]),-1,1);r.iy=clamp(num(inp[1]),-1,1);
       const ds=num(inp[2])|0,last=M.lastDseq[r.peer];
@@ -1519,7 +1520,11 @@ function clientFrame(dt){
     const me=M.mySlot>=0?g.rings[M.mySlot]:null;
     if(me){if(applyLocalInput(me)){M.dseq++;M.sendT=0}}else{Input.dashQ=false}
     g.tick(dt);
-    if(me){(M.hist||(M.hist=[])).push({t:performance.now(),x:me.x,y:me.y,vx:me.vx,vy:me.vy});while(M.hist.length>240)M.hist.shift()}
+    if(me){
+      const sp=Math.hypot(me.vx,me.vy),cap=DASHV*1.8;if(sp>cap){me.vx*=cap/sp;me.vy*=cap/sp}
+      (M.hist||(M.hist=[])).push({t:performance.now(),x:me.x,y:me.y,vx:me.vx,vy:me.vy});while(M.hist.length>240)M.hist.shift();
+      clientClaim(M,g,me,g.orb.x-me.x,g.orb.y-me.y,0);
+    }
   }
   M.sendT-=dt;
   if(M.sendT<=0){M.sendT=STANDALONE?1/40:.05;const me=g&&M.mySlot>=0?g.rings[M.mySlot]:null;
@@ -1553,6 +1558,28 @@ function clientApplyL(L){
 }
 // Own-ring reconciliation: compare the host's state with where our ring was when the host read that input,
 // so latency alone never pulls us backward; only real differences (bumps, collisions) get corrected.
+// Catching for players who join: their game tells the host "the orb is in my ring, here",
+// and the host agrees when its own view has that ring right next to the orb.
+function clientClaim(M,g,me,dx,dz,dy){
+  const now=performance.now(),caught=g.phase==='play'&&g.carrier===M.mySlot;
+  if(!caught){M.claim=null;return}
+  if(!M.claim){M.claimId=(M.claimId||0)+1;M.claim={id:M.claimId,t0:now,sent:0,dead:false}}
+  const C=M.claim;
+  if(M.hostHas||C.dead)return;
+  if(now-C.t0>Math.max(700,M.rtt*2500)){C.dead=true;return}
+  if(now-C.sent>140){C.sent=now;M.room.presence({cl:[C.id,Math.round(dx),Math.round(dz),Math.round(dy)]}).catch(()=>{})}
+}
+function hostClaimFrom(M,g,r,cl){
+  const id=num(cl[0])|0,done=M.claimDone||(M.claimDone={});
+  if(!id||done[r.peer]===id||g.phase!=='play'||r.stun>0)return;
+  const o=g.orb;
+  if(Math.hypot(o.x-r.x,o.y-r.y)>190)return;
+  if(g.carrier>=0&&g.carrier!==r.i)return;
+  
+  let dx=num(cl[1]),dz=num(cl[2]);const l=Math.hypot(dx,dz),m=RI-OR-1;if(l>m){dx*=m/(l||1);dz*=m/(l||1)}
+  o.x=r.x+dx;o.y=r.y+dz;o.vx=r.vx;o.vy=r.vy;o.last=r.i;
+  done[r.peer]=id;
+}
 function histAt(M,t){
   const H=M.hist;if(!H||!H.length)return null;
   if(t<=H[0].t)return H[0];
@@ -1576,15 +1603,18 @@ function clientApplySnap(s){
     const mine=i===M.mySlot;
     if(hard){r.x=x;r.y=y;r.vx=vx;r.vy=vy;if(!mine||g.phase!=='cd')r.f=f}
     else{
-      const h=mine&&ackT>0?histAt(M,ackT+20):null;
+      // while the host has us stunned there is no input to predict: just follow the host
+      const sst=num(a[7]),h=mine&&ackT>0&&sst<=0&&r.stun<=0?histAt(M,ackT+20):null;
       if(h){
         const ex=x-h.x,ey=y-h.y,el=Math.hypot(ex,ey),c=el>140?1:el>4?.2:0;
         if(c){r.x+=ex*c;r.y+=ey*c;shiftHist(M,{x:ex*c,y:ey*c})}
-        const evx=vx-h.vx,evy=vy-h.vy;if(Math.hypot(evx,evy)>240){r.vx+=evx*.6;r.vy+=evy*.6}
+        const evx=vx-h.vx,evy=vy-h.vy;
+        if(Math.hypot(evx,evy)>240){const cx=evx*.6,cy=evy*.6;r.vx+=cx;r.vy+=cy;shiftHist(M,{vx:cx,vy:cy})}
       }else{
-        const tx=x+vx*lat,ty=y+vy*lat,ex=tx-r.x,ey=ty-r.y,el=Math.hypot(ex,ey),k=mine?.22:.55;
+        const free=mine&&sst<=0&&r.stun<=0;
+        const tx=x+vx*lat,ty=y+vy*lat,ex=tx-r.x,ey=ty-r.y,el=Math.hypot(ex,ey),k=free?.22:.55;
         if(el>150){r.x=tx;r.y=ty}else{r.x+=ex*k;r.y+=ey*k}
-        if(mine){r.vx+=(vx-r.vx)*.25;r.vy+=(vy-r.vy)*.25}else{r.vx=vx;r.vy=vy;r.f=f}
+        if(free){r.vx+=(vx-r.vx)*.25;r.vy+=(vy-r.vy)*.25}else{r.vx=vx;r.vy=vy;if(!mine)r.f=f}
       }
     }
     if(!mine){r.ix=clamp(num(a[5]),-1,1);r.iy=clamp(num(a[6]),-1,1);r.dashT=num(a[9])}
@@ -1595,7 +1625,10 @@ function clientApplySnap(s){
   else{
     const last=num(s.o[4],-1)|0,me=M.mySlot>=0?g.rings[M.mySlot]:null,sm=me?s.r[M.mySlot]:null;
     const smx=sm?num(sm[0]):0,smy=sm?num(sm[1]):0;
-    if(me&&last===M.mySlot&&Math.hypot(ox-smx,oy-smy)<RI-OR+6){
+    M.hostHas=!!(me&&last===M.mySlot&&Math.hypot(ox-smx,oy-smy)<RI-OR+6);
+    const pending=M.claim&&!M.claim.dead&&!M.hostHas&&g.carrier===M.mySlot;
+    if(pending){/* our catch is on its way to the host: keep the orb where we have it */}
+    else if(M.hostHas){
       // we carry it: keep it inside our own ring, where the host has it relative to us
       const tx=me.x+(ox-smx),ty=me.y+(oy-smy);o.x+=(tx-o.x)*.5;o.y+=(ty-o.y)*.5;o.vx=me.vx+(ovx-num(sm[2]));o.vy=me.vy+(ovy-num(sm[3]));
     }else{
@@ -1722,7 +1755,7 @@ function applyUrlParams(){
   else if(go==='bots')show('bots');
   else if(go==='online')openOnline();
   else if(go==='free')startFree();
-  try{history.replaceState(null,'',location.pathname)}catch{}
+  if(j||q.get('host')||go)try{history.replaceState(null,'',location.pathname)}catch{}
 }
 function leaveMatch(msg){
   const M=Net.match;if(!M)return;

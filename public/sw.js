@@ -1,4 +1,4 @@
-const C='loopball-site-v2';
+const C='loopball-site-v3';
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['/','/2d/','/3d/','/vendor/three.min.js','/manifest.webmanifest','/icon.svg'])).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
