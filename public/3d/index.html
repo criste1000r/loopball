@@ -41,6 +41,22 @@ body{background:var(--stadium);color:var(--chalk);font-family:var(--body);font-s
 #touch{position:fixed;inset:0;z-index:2}
 body.mouse-ctl #touch{cursor:crosshair}
 input[type=range].steerIn{width:100%;accent-color:#f3f6f9;height:28px;cursor:pointer;margin:0}
+input[type=range].rngIn{width:100%;accent-color:#f3f6f9;height:28px;cursor:pointer;margin:0}
+.kblist{display:flex;flex-direction:column;gap:6px}
+.krow{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:6px;align-items:center}
+.kl{font-size:14px;line-height:1.2}
+#setOri .chip{font-size:17px;padding:9px 4px;min-width:0}
+.kbtn{font:inherit;font-weight:700;font-size:14px;padding:7px 6px;border-radius:9px;border:2px solid var(--line);background:transparent;color:var(--chalk);cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kbtn:hover,.kbtn:focus-visible{border-color:var(--chalk);outline:none}
+.kbtn.wait{background:var(--chalk);color:var(--ink);border-color:var(--chalk)}
+#tedit{position:fixed;inset:0;z-index:20;touch-action:none;background:rgba(14,26,43,.3)}
+#tedit .tebar{position:absolute;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 10px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:center;background:rgba(14,26,43,.92);border:1px solid var(--line);border-radius:14px;padding:10px 12px;color:var(--chalk);font-size:14px}
+#tedit .tebar b{width:100%;text-align:center;font-weight:600;color:var(--muted)}
+#tedit .tesz{display:flex;align-items:center;gap:8px;flex:1 1 220px;min-width:0}
+#tedit .tesz input{flex:1;min-width:0}
+#tedit .tesz span{min-width:3.2em;text-align:right;font-variant-numeric:tabular-nums}
+.tesel{outline:3px dashed var(--chalk);outline-offset:6px}
+
 .rng{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:-2px}
 .steerVal{color:var(--chalk);letter-spacing:.04em;text-transform:none}
 #ui{position:fixed;inset:0;z-index:5;display:flex;overflow-y:auto;
@@ -132,7 +148,7 @@ kbd{font-family:var(--body);font-size:12px;font-weight:700;border:1px solid var(
 #stick{position:fixed;z-index:3;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(243,246,249,.4);background:rgba(14,26,43,.18);pointer-events:none}
 #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(243,246,249,.6)}
 .tbtn{position:fixed;z-index:3;pointer-events:none;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-family:var(--display);font-weight:900;letter-spacing:.05em;transition:transform .08s,opacity .15s;color:var(--chalk)}
-.tbtn.press{transform:scale(.9)}
+.tbtn.press{scale:.9}
 #dashBtn{width:108px;height:108px;right:calc(max(16px,var(--sa-right,env(safe-area-inset-right,0px))) + 14px);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 26px);background:rgba(58,98,255,.45);font-size:24px}
 #dashBtn.t1{background:rgba(255,117,54,.5)}
 #dashBtn.empty{opacity:.55}
@@ -221,6 +237,7 @@ a.back{text-decoration:none;display:inline-block}
 <canvas id="ov"></canvas>
 <div id="labels"></div>
 <div id="touch" hidden></div>
+<div id="tedit" hidden><div class="tebar"><b>Drag a button to move it · tap one to pick it</b><div class="tesz"><span id="teWhich">Dash</span><input type="range" class="rngIn" id="teSize" min="60" max="170" step="5" value="100" aria-label="Button size"><span id="teSizeV">100%</span></div><button class="sm" id="teDef">Default</button><button class="sm" id="teDone">Done</button></div></div>
 <div id="stick" hidden><div id="knob"></div></div>
 <div id="hopBtn" class="tbtn" hidden>HOP</div>
 <div id="dashBtn" class="tbtn" hidden><svg class="prog" viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="55"/><circle class="bar" id="dashProg" cx="60" cy="60" r="55" pathLength="100"/></svg><span>DASH</span><div class="pips"><span class="pip on"></span><span class="pip on"></span></div></div>
@@ -252,11 +269,9 @@ a.back{text-decoration:none;display:inline-block}
     </div>
     <div class="row2">
       <button class="link" data-go="how">How to play</button>
+      <button class="link" data-act="settings">Settings</button>
       <button class="link fsLink" data-act="fs" hidden>Full screen</button>
-      <button class="link ctlBtn deskOnly" data-act="ctl">Controls: Mouse</button>
-      <button class="link oriBtn" data-act="ori" hidden>In game: Landscape</button>
     </div>
-    <div class="group deskOnly"><label class="lbl" for="steerIn1">A/D turn speed · Steer keys · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
   </section>
 
   <section class="screen" id="s-bots" hidden>
@@ -325,16 +340,25 @@ a.back{text-decoration:none;display:inline-block}
     <button class="big primary" data-act="free">Try free play</button>
   </section>
 
+  <section class="screen" id="s-settings" hidden>
+    <button class="back" data-act="setback">← Back</button>
+    <h2>Settings</h2>
+    <div class="group"><label class="lbl" for="volIn">Sound volume · <span id="volVal">80%</span></label><input type="range" class="rngIn" id="volIn" min="0" max="100" step="5" value="80"></div>
+    <div class="group"><div class="lbl">Camera</div><div class="chips" id="setCam"><button class="chip" data-v="1">Ball cam</button><button class="chip" data-v="0">Ring cam</button></div></div>
+    <div class="group touchOnly"><div class="lbl">Matches on phones</div><div class="chips" id="setOri"><button class="chip" data-v="land">Landscape</button><button class="chip" data-v="flip">Flipped</button><button class="chip" data-v="port">Portrait</button></div></div>
+    <div class="group touchOnly"><div class="lbl">Touch buttons</div><div class="row2"><button class="sm" id="teOpen">Move and resize</button><button class="sm" id="teReset">Default</button></div></div>
+    <div class="group deskOnly"><div class="lbl">Controls</div><div class="chips" data-set="ctl"><button class="chip" data-v="mouse">Mouse</button><button class="chip" data-v="steer">Steer keys</button><button class="chip" data-v="classic">Classic</button></div></div>
+    <div class="group deskOnly"><label class="lbl" for="steerIn1">Steer keys turn speed · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
+    <div class="group deskOnly"><div class="lbl">Keys · click one, then press the new key</div><div class="kblist" id="keyList"></div><div class="row2"><button class="sm" id="keysReset">Default keys</button></div></div>
+    <button class="big fsLink" data-act="fs" hidden>Full screen</button>
+  </section>
+
   <section class="screen" id="s-pause" hidden>
     <h2 id="pauseTitle">Paused</h2>
     <div class="stack">
       <button class="big primary" data-act="resume">Resume</button>
       <button class="big" data-act="restart" id="restartBtn">Restart</button>
-      <button class="big ctlBtn deskOnly" data-act="ctl">Controls: Mouse</button>
-      <button class="big oriBtn" data-act="ori" hidden>In game: Landscape</button>
-      <div class="group deskOnly"><label class="lbl" for="steerIn2">A/D turn speed · Steer keys · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn2" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
-      <button class="big" data-act="cam" id="camMenuBtn">Ball cam: on</button>
-      <button class="big" data-act="sound" id="soundBtn">Sound: on</button>
+      <button class="big" data-act="settings">Settings <span class="k">Sound, controls, buttons</span></button>
       <button class="big" data-act="quit" id="quitBtn">Quit to menu</button>
     </div>
   </section>
@@ -1061,9 +1085,9 @@ function botDecide(g,r,P){
 }
 
 /* ================= audio ================= */
-const Sfx={c:null,on:store.get('sound',true),last:0,
+const Sfx={c:null,vol:clamp(num(store.get('vol',store.get('sound',true)===false?0:.8),.8),0,1),last:0,
   init(){if(this.c)return;try{this.c=new(window.AudioContext||window.webkitAudioContext)()}catch{this.c=null}},
-  tone(f,d,type,v,slide){const c=this.c;if(!c||!this.on||document.hidden)return;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0008,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
+  tone(f,d,type,v,slide){const c=this.c;if(!c||!(this.vol>0)||document.hidden)return;v*=this.vol;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(Math.min(.0008,v*.01),t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
   hit(s){const n=performance.now();if(n-this.last<45)return;this.last=n;this.tone(180+Math.min(s,1400)*.35,.07,'triangle',Math.min(.22,.04+s/5000))},
   wall(s){this.tone(120+Math.min(s,1200)*.08,.06,'sine',Math.min(.12,s/9000))},
   dash(){this.tone(560,.13,'sawtooth',.045,.45)},
@@ -1101,7 +1125,8 @@ document.querySelectorAll('[data-set]').forEach(g=>g.addEventListener('click',e=
 }));
 syncChips();
 function toggleCam(){settings.ballCam=!settings.ballCam;store.set('ballCam',settings.ballCam);syncCamLabel();toast(settings.ballCam?'Ball cam on':'Ball cam off',1100)}
-function syncCamLabel(){$('camBtn').textContent=settings.ballCam?'Ball cam':'Ring cam';$('camMenuBtn').textContent='Ball cam: '+(settings.ballCam?'on':'off')}
+function syncCamLabel(){$('camBtn').textContent=settings.ballCam?'Ball cam':'Ring cam';if(typeof syncCamChips==='function')syncCamChips()}
+function syncCamChips(){document.querySelectorAll('#setCam .chip').forEach(c=>c.setAttribute('aria-pressed',String((c.dataset.v==='1')===settings.ballCam)))}
 ui.addEventListener('click',e=>{
   Sfx.init();
   const b=e.target.closest('button');if(!b)return;
@@ -1112,7 +1137,8 @@ ui.addEventListener('click',e=>{
   else if(a==='free')startFree();
   else if(a==='resume')resume();
   else if(a==='restart'){if(app.mode==='free')startFree();else startLocal()}
-  else if(a==='sound'){Sfx.on=!Sfx.on;store.set('sound',Sfx.on);$('soundBtn').textContent='Sound: '+(Sfx.on?'on':'off')}
+  else if(a==='settings')openSettings();
+  else if(a==='setback')closeSettings();
   else if(a==='cam')toggleCam();
   else if(a==='ctl')cycleCtl();
   else if(a==='ori'){const o=['land','flip','port'];ORI.mode=o[(o.indexOf(ORI.mode)+1)%3];store.set('orient',ORI.mode);syncOriLabels();if(ORI.locked){ORI.locked=false;try{screen.orientation.unlock()}catch{}}ORI.lockTry=0;syncOrient();toast(ORI.mode==='port'?'Matches stay upright':'Matches play sideways'+(ORI.mode==='flip'?', turned the other way':''),1800)}
@@ -1121,7 +1147,6 @@ ui.addEventListener('click',e=>{
   else if(a==='lobby')hostBackToLobby();
   else if(a==='again'){if(app.mode==='online')hostRematch();else if(app.mode==='free')startFree();else startLocal()}
 });
-$('soundBtn').textContent='Sound: '+(Sfx.on?'on':'off');
 $('pauseBtn').addEventListener('click',()=>{Sfx.init();openPause()});
 $('camBtn').addEventListener('click',()=>toggleCam());
 $('resetBtn').addEventListener('click',()=>{if(app.mode==='free'&&app.game)app.game.respawnOrb(true)});
@@ -1146,7 +1171,7 @@ $('fsBtn').addEventListener('click',()=>FS.toggle());
 // turned 90 degrees, so turning the phone sideways shows it the right way up. Menus stay as they are.
 const ORI={mode:['land','flip','port'].includes(store.get('orient','land'))?store.get('orient','land'):'land',rot:0,w:0,h:0,locked:false,lockTry:0};
 const ORI_LABEL={land:'In game: Landscape',flip:'In game: Landscape, flipped',port:'In game: Portrait'};
-function oriWanted(){return !!app.game&&app.mode!=='attract'&&ORI.mode!=='port'&&Input.touchUI}
+function oriWanted(){return ((!!app.game&&app.mode!=='attract')||TE.on)&&ORI.mode!=='port'&&Input.touchUI}
 function syncOrient(){
   const want=oriWanted(),so=screen.orientation;
   if(want&&!ORI.locked&&so&&so.lock&&(FS.on()||FS.installed)&&Date.now()-ORI.lockTry>4000){
@@ -1174,8 +1199,137 @@ function syncOrient(){
 function lp(x,y){return ORI.rot===90?[y,innerWidth-x]:ORI.rot===-90?[innerHeight-y,x]:[x,y]}
 function layoutW(){return ORI.rot?innerHeight:innerWidth}
 function layoutH(){return ORI.rot?innerWidth:innerHeight}
-function syncOriLabels(){document.querySelectorAll('.oriBtn').forEach(b=>{b.textContent=ORI_LABEL[ORI.mode];b.hidden=!Input.touchUI})}
+function syncOriLabels(){document.querySelectorAll('#setOri .chip').forEach(c=>c.setAttribute('aria-pressed',String(c.dataset.v===ORI.mode)))}
 addEventListener('resize',syncOrient);addEventListener('orientationchange',()=>setTimeout(syncOrient,200));
+
+/* ================= settings: volume, keys, touch buttons ================= */
+const HAS_HOP=!!document.getElementById('hopBtn');
+var TE={on:false,sel:'dash',drag:null};   // touch button editor state (var: syncHud may look before this line runs)
+// ----- volume
+function setVol(v,save){Sfx.vol=clamp(v,0,1);if(save!==false)store.set('vol',Sfx.vol);$('volIn').value=Math.round(Sfx.vol*100);$('volVal').textContent=Sfx.vol>0?Math.round(Sfx.vol*100)+'%':'Off'}
+$('volIn').addEventListener('input',()=>setVol(+$('volIn').value/100));
+$('volIn').addEventListener('change',()=>{Sfx.init();Sfx.tick()});
+// ----- the screen
+let setFrom='home';
+function openSettings(){setFrom=curScreen==='pause'?'pause':'home';syncSettings();show('settings')}
+function closeSettings(){kbWait=null;show(setFrom)}
+function syncSettings(){
+  setVol(Sfx.vol,false);syncChips();syncSteer();renderKeys();syncOriLabels();syncCamChips();
+  const touch=Input.touchUI||matchMedia('(pointer:coarse)').matches;
+  document.querySelectorAll('#s-settings .touchOnly').forEach(e=>{e.hidden=!touch});
+}
+document.querySelectorAll('#s-settings [data-set="ctl"]').forEach(g=>g.addEventListener('click',()=>{Input.steerH=null;syncCtlLabels()}));
+$('setOri').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  ORI.mode=c.dataset.v;store.set('orient',ORI.mode);syncOriLabels();
+  if(ORI.locked){ORI.locked=false;try{screen.orientation.unlock()}catch{}}ORI.lockTry=0;syncOrient();
+});
+// ----- keys: two per action, Escape always pauses too
+const KB_ACTS=HAS_HOP
+  ?[['up','Drive / forward'],['down','Brake / back'],['left','Left'],['right','Right'],['dash','Dash'],['hop','Hop'],['cam','Ball cam'],['reset','Reset orb (free play)'],['pause','Pause (Esc also works)']]
+  :[['up','Drive / up'],['down','Brake / down'],['left','Left'],['right','Right'],['dash','Dash'],['reset','Reset orb (free play)'],['pause','Pause (Esc also works)']];
+const KB_DEF=HAS_HOP
+  ?{up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],dash:['ShiftLeft','KeyJ'],hop:['Space','KeyL'],cam:['KeyC','KeyV'],reset:['KeyR',''],pause:['KeyP','']}
+  :{up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],dash:['Space','ShiftLeft'],reset:['KeyR',''],pause:['KeyP','']};
+function loadKB(raw){const o={};for(const[a]of KB_ACTS){const v=raw&&Array.isArray(raw[a])?raw[a]:KB_DEF[a];o[a]=[0,1].map(i=>typeof v[i]==='string'&&/^[A-Za-z0-9]{1,24}$/.test(v[i])?v[i]:'')}return o}
+let KB=loadKB(store.get('keys',null)),kbWait=null;
+function kbHas(a){const k=Input.keys;return KB[a].some(c=>c&&k.has(c))}
+function kbIs(a,code){return !!code&&KB[a].includes(code)}
+function kbAny(code){for(const a in KB)if(KB[a].includes(code))return true;return false}
+const KEYNAMES={ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',Space:'Space',ShiftLeft:'L Shift',ShiftRight:'R Shift',ControlLeft:'L Ctrl',ControlRight:'R Ctrl',AltLeft:'L Alt',AltRight:'R Alt',MetaLeft:'L Cmd',MetaRight:'R Cmd',Enter:'Enter',Tab:'Tab',Backquote:'`',Minus:'-',Equal:'=',BracketLeft:'[',BracketRight:']',Backslash:'\\',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',CapsLock:'Caps',IntlBackslash:'\\'};
+function keyName(c){return !c?'—':c.startsWith('Key')?c.slice(3):c.startsWith('Digit')?c.slice(5):c.startsWith('Numpad')?'Num '+c.slice(6):KEYNAMES[c]||c}
+function renderKeys(){
+  const box=$('keyList');box.textContent='';
+  for(const[a,label]of KB_ACTS){
+    const row=document.createElement('div');row.className='krow';
+    const l=document.createElement('span');l.className='kl';l.textContent=label;row.append(l);
+    for(const i of[0,1]){
+      const b=document.createElement('button'),w=kbWait&&kbWait.a===a&&kbWait.i===i;
+      b.type='button';b.className='kbtn'+(w?' wait':'');b.dataset.a=a;b.dataset.i=i;
+      b.textContent=w?'Press a key':keyName(KB[a][i]);
+      b.setAttribute('aria-label',`${label}, key ${i+1}: ${KB[a][i]?keyName(KB[a][i]):'none'}. Activate, then press the new key.`);
+      row.append(b);
+    }
+    box.append(row);
+  }
+  if(kbWait){const b=box.querySelector('.kbtn.wait');if(b)b.focus({preventScroll:true})}
+}
+$('keyList').addEventListener('click',e=>{const b=e.target.closest('.kbtn');if(!b)return;e.stopPropagation();kbWait={a:b.dataset.a,i:+b.dataset.i};renderKeys()});
+document.addEventListener('click',e=>{if(kbWait&&!e.target.closest('.kbtn')){kbWait=null;renderKeys()}});
+// while waiting for a key, it goes to the binding and nowhere else
+window.addEventListener('keydown',e=>{
+  if(!kbWait)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  const{a,i}=kbWait;kbWait=null;
+  if(e.code==='Escape'){renderKeys();return}
+  if(e.code==='Backspace'||e.code==='Delete')KB[a][i]='';
+  else if(e.code){for(const k in KB)KB[k]=KB[k].map(c=>c===e.code?'':c);KB[a][i]=e.code}
+  store.set('keys',KB);renderKeys();
+},true);
+$('keysReset').addEventListener('click',()=>{KB=loadKB(null);store.set('keys',null);kbWait=null;renderKeys();toast('Keys are back to default',1500)});
+// ----- touch buttons: each can be moved and resized; positions are fractions of the play area
+const TB_KEYS=HAS_HOP?['dash','hop']:['dash'];
+function loadTL(raw){const o={};for(const k of TB_KEYS){const t=raw&&raw[k];o[k]=t&&Number.isFinite(t.x)&&Number.isFinite(t.y)?{x:clamp(t.x,0,1),y:clamp(t.y,0,1),s:clamp(num(t.s,1),.6,1.7)}:null}return o}
+let TL=loadTL(store.get('touchLayout',null));
+function tbEl(k){return k==='hop'?$('hopBtn'):$('dashBtn')}
+function applyTouchLayout(){
+  for(const k of TB_KEYS){
+    const el=tbEl(k),t=TL[k],st=el.style;
+    if(!t){st.left=st.top=st.right=st.bottom=st.transform=''}
+    else{st.left=(t.x*100)+'%';st.top=(t.y*100)+'%';st.right='auto';st.bottom='auto';st.transform=`translate(-50%,-50%) scale(${t.s})`}
+  }
+}
+// center and radius of a touch button in play-area coordinates
+function tbGeom(k){const el=tbEl(k);if(!el||el.hidden)return null;const r=el.getBoundingClientRect();if(!r.width)return null;const[x,y]=lp(r.left+r.width/2,r.top+r.height/2);return{x,y,r:Math.max(r.width,r.height)/2}}
+// which button a touch at (px,py) means: one under the finger (a bit generous), else the nearest when `near`
+function touchHit(px,py,near){
+  let best=null,bd=1e9;
+  for(const k of TB_KEYS){const g=tbGeom(k);if(!g)continue;const d=Math.hypot(px-g.x,py-g.y)/g.r;if(d<bd){bd=d;best=k}}
+  return best&&(near||bd<1.2)?best:null;
+}
+// ----- the editor
+function openTouchEdit(){
+  TE.on=true;TE.sel='dash';TE.drag=null;
+  show(null);
+  $('tedit').hidden=false;syncHud();syncOrient();
+  for(const k of TB_KEYS)tbEl(k).hidden=false;stickEl.hidden=false;placeStick();
+  teSelect('dash');
+}
+function closeTouchEdit(){
+  TE.on=false;TE.drag=null;$('tedit').hidden=true;
+  for(const k of TB_KEYS)tbEl(k).classList.remove('tesel');
+  store.set('touchLayout',TB_KEYS.some(k=>TL[k])?TL:null);
+  syncOrient();openSettings();syncHud();
+}
+function teSelect(k){
+  TE.sel=k;for(const q of TB_KEYS)tbEl(q).classList.toggle('tesel',q===k);
+  const t=TL[k];$('teSize').value=Math.round((t?t.s:1)*100);$('teSizeV').textContent=Math.round((t?t.s:1)*100)+'%';
+  $('teWhich').textContent=k==='hop'?'Hop':'Dash';
+}
+function teEnsure(k){if(!TL[k]){const g=tbGeom(k),W=layoutW(),H=layoutH();TL[k]={x:g?g.x/W:.85,y:g?g.y/H:.8,s:1}}return TL[k]}
+$('tedit').addEventListener('pointerdown',e=>{
+  if(e.target.closest('.tebar'))return;
+  e.preventDefault();
+  const[px,py]=lp(e.clientX,e.clientY),k=touchHit(px,py,false)||touchHit(px,py,true);
+  const g=tbGeom(k);if(!g)return;
+  if(Math.hypot(px-g.x,py-g.y)>g.r*2.2){teSelect(k);return}
+  teSelect(k);const t=teEnsure(k);
+  TE.drag={id:e.pointerId,k,ox:px-t.x*layoutW(),oy:py-t.y*layoutH()};
+  try{$('tedit').setPointerCapture(e.pointerId)}catch{}
+});
+$('tedit').addEventListener('pointermove',e=>{
+  const d=TE.drag;if(!d||d.id!==e.pointerId)return;
+  const[px,py]=lp(e.clientX,e.clientY),t=TL[d.k];
+  t.x=clamp((px-d.ox)/layoutW(),.03,.97);t.y=clamp((py-d.oy)/layoutH(),.05,.97);applyTouchLayout();
+});
+const teUp=e=>{if(TE.drag&&TE.drag.id===e.pointerId)TE.drag=null};
+$('tedit').addEventListener('pointerup',teUp);$('tedit').addEventListener('pointercancel',teUp);
+$('teSize').addEventListener('input',()=>{const t=teEnsure(TE.sel);t.s=clamp(+$('teSize').value/100,.6,1.7);$('teSizeV').textContent=Math.round(t.s*100)+'%';applyTouchLayout()});
+$('teDef').addEventListener('click',()=>{TL=loadTL(null);applyTouchLayout();teSelect(TE.sel);toast('Buttons are back to default',1400)});
+$('teDone').addEventListener('click',closeTouchEdit);
+$('teOpen').addEventListener('click',openTouchEdit);
+$('teReset').addEventListener('click',()=>{TL=loadTL(null);store.set('touchLayout',null);applyTouchLayout();toast('Touch buttons are back to default',1500)});
+applyTouchLayout();
 
 
 /* ================= app state ================= */
@@ -1221,6 +1375,7 @@ function syncHud(){
   $('fsBtn').hidden=!(playing&&(FS.can||FS.ios)&&!FS.installed);
   labelsEl.hidden=app.mode==='attract'||app.mode==='free';
   if(!playing){Input.stickT=null;Input.keys.clear();document.body.classList.remove('replaying');$('replayUI').hidden=true;$('skipBtn').hidden=true}
+  if(TE&&TE.on){stickEl.hidden=false;for(const k of TB_KEYS)tbEl(k).hidden=false}
 }
 function myName(){const v=($('nameIn').value||'').trim().slice(0,14);return v||store.get('name','')||'Player'}
 $('nameIn').value=store.get('name','');
@@ -1236,13 +1391,13 @@ window.addEventListener('keydown',e=>{
   Sfx.init();
   if(e.target&&e.target.tagName==='INPUT'){if(e.key==='Escape')e.target.blur();return}
   if(inPlay()){
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Tab'].includes(e.code))e.preventDefault();
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Tab'].includes(e.code)||kbAny(e.code))e.preventDefault();
     Input.keys.add(e.code);
-    if(!e.repeat&&DASHKEYS.includes(e.code))Input.dashQ=true;
-    if(!e.repeat&&HOPKEYS.includes(e.code))Input.hopQ=true;
-    if(!e.repeat&&(e.code==='KeyC'||e.code==='KeyV'))toggleCam();
-    if(!e.repeat&&(e.code==='Escape'||e.code==='KeyP'))openPause();
-    if(!e.repeat&&e.code==='KeyR'&&app.mode==='free')app.game.respawnOrb(true);
+    if(!e.repeat&&kbIs('dash',e.code))Input.dashQ=true;
+    if(!e.repeat&&kbIs('hop',e.code))Input.hopQ=true;
+    if(!e.repeat&&kbIs('cam',e.code))toggleCam();
+    if(!e.repeat&&(e.code==='Escape'||kbIs('pause',e.code)))openPause();
+    if(!e.repeat&&kbIs('reset',e.code)&&app.mode==='free')app.game.respawnOrb(true);
     if(Input.touchUI){Input.touchUI=false;syncHud()}
   }else menuKey(e);
 });
@@ -1250,7 +1405,11 @@ window.addEventListener('keyup',e=>Input.keys.delete(e.code));
 window.addEventListener('blur',()=>Input.keys.clear());
 function focusables(){if(!curScreen)return[];return[...document.querySelectorAll('#s-'+curScreen+' button, #s-'+curScreen+' input')].filter(b=>!b.disabled&&b.offsetParent!==null)}
 function menuMove(d){const f=focusables();if(!f.length)return;let i=f.indexOf(document.activeElement);i=i<0?0:(i+d+f.length)%f.length;f[i].focus();f[i].scrollIntoView({block:'nearest'})}
-function menuBack(){if(curScreen==='pause')resume();else if(['bots','online','how'].includes(curScreen))show('home')}
+function menuBack(){
+  if(TE.on){closeTouchEdit();return}
+  if(curScreen==='settings'){closeSettings();return}
+  if(curScreen==='pause')resume();else if(['bots','online','how'].includes(curScreen))show('home');
+}
 function menuKey(e){
   if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();menuMove(1)}
   else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();menuMove(-1)}
@@ -1265,12 +1424,13 @@ touchEl.addEventListener('pointerdown',e=>{
   e.preventDefault();
   if(!Input.touchUI){Input.touchUI=true;syncHud();syncOriLabels()}
   const[px,py]=lp(e.clientX,e.clientY);
-  if(px<layoutW()*.5){
+  const hit=touchHit(px,py,false);
+  if(!hit&&px<layoutW()*.5){
     // a new touch on the left always takes the stick, so a stick whose finger-up got lost can never stay stuck
     Input.stickT={id:e.pointerId,ox:px,oy:py,x:px,y:py};placeStick()
   }else{
-    const[dx,dy]=centerOf(dashEl),[hx,hy]=centerOf(hopEl);
-    if(Math.hypot(px-hx,py-hy)<Math.hypot(px-dx,py-dy)){Input.hopQ=true;pressAnim(hopEl)}
+    const k=hit||touchHit(px,py,true);
+    if(k==='hop'){Input.hopQ=true;pressAnim(hopEl)}
     else{Input.dashQ=true;pressAnim(dashEl)}
   }
   try{touchEl.setPointerCapture(e.pointerId)}catch{}
@@ -1311,7 +1471,7 @@ function screenStick(){
   }
   return null;
 }
-function keyAxes(){const k=Input.keys;return[(k.has('KeyD')||k.has('ArrowRight')?1:0)-(k.has('KeyA')||k.has('ArrowLeft')?1:0),(k.has('KeyS')||k.has('ArrowDown')?1:0)-(k.has('KeyW')||k.has('ArrowUp')?1:0)]}
+function keyAxes(){return[(kbHas('right')?1:0)-(kbHas('left')?1:0),(kbHas('down')?1:0)-(kbHas('up')?1:0)]}
 // stick is relative to the camera: up drives where the camera looks
 function camToWorld(sx,sy){const c=Math.cos(cam.yaw),s=Math.sin(cam.yaw);return[c*(-sy)+(-s)*sx,s*(-sy)+c*sx]}
 function worldStick(r){
