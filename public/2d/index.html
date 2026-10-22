@@ -40,8 +40,8 @@ input[type=range].steerIn{width:100%;accent-color:#f3f6f9;height:28px;cursor:poi
 .rng{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:-2px}
 .steerVal{color:var(--chalk);letter-spacing:.04em;text-transform:none}
 #ui{position:fixed;inset:0;z-index:5;display:flex;overflow-y:auto;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  padding-block:calc(env(safe-area-inset-top,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 20px);
+  padding-left:max(16px,var(--sa-left,env(safe-area-inset-left,0px)));padding-right:max(16px,var(--sa-right,env(safe-area-inset-right,0px)));
+  padding-block:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 20px) calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 20px);
   background:linear-gradient(90deg,rgba(14,26,43,.92) 0%,rgba(14,26,43,.78) 45%,rgba(14,26,43,.35) 100%);touch-action:pan-y}
 .screen{width:min(440px,100%);margin:auto auto auto max(0px,calc(12vw - 60px));display:flex;flex-direction:column;gap:16px}
 @media (max-width:760px){.screen{margin:auto}#ui{background:rgba(14,26,43,.86)}}
@@ -105,7 +105,7 @@ kbd{font-family:var(--body);font-size:12px;font-weight:700;border:1px solid var(
 .stats td:last-child{text-align:right;font-weight:700}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
 
-#hud{position:fixed;left:0;right:0;top:0;z-index:3;pointer-events:none;display:flex;justify-content:center;padding-top:calc(env(safe-area-inset-top,0px) + 10px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#hud{position:fixed;left:0;right:0;top:0;z-index:3;pointer-events:none;display:flex;justify-content:center;padding-top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 10px);padding-left:max(16px,var(--sa-left,env(safe-area-inset-left,0px)));padding-right:max(16px,var(--sa-right,env(safe-area-inset-right,0px)))}
 .board{display:flex;align-items:stretch;border-radius:10px;overflow:hidden;font-family:var(--display);font-weight:900;font-variant-numeric:tabular-nums;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .board .sc{min-width:52px;text-align:center;font-size:32px;line-height:44px;padding:0 10px}
 .board .sc.b{background:var(--blue)} .board .sc.o{background:var(--orange);color:var(--ink)}
@@ -116,13 +116,13 @@ kbd{font-family:var(--body);font-size:12px;font-weight:700;border:1px solid var(
 @media (prefers-reduced-motion:reduce){.board .clk.lp{animation:none;background:#ffd7c4}}
 .fp{font-family:var(--body);font-weight:600;font-size:14px;background:rgba(14,26,43,.82);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:16px;font-variant-numeric:tabular-nums}
 .fp span b{font-family:var(--display);font-size:22px;font-weight:900;margin-left:4px}
-#pauseBtn{position:fixed;z-index:4;top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(max(16px,env(safe-area-inset-right,0px)));width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:2px}
+#pauseBtn{position:fixed;z-index:4;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 12px);right:calc(max(16px,var(--sa-right,env(safe-area-inset-right,0px))));width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:2px}
 #pauseBtn:focus-visible{outline:2px solid var(--chalk)}
-#ping{position:fixed;z-index:3;top:calc(env(safe-area-inset-top,0px) + 62px);right:calc(max(16px,env(safe-area-inset-right,0px)));font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-#resetBtn{position:fixed;z-index:4;top:calc(env(safe-area-inset-top,0px) + 62px);left:max(16px,env(safe-area-inset-left,0px));height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;font-weight:700;padding:0 14px}
+#ping{position:fixed;z-index:3;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 62px);right:calc(max(16px,var(--sa-right,env(safe-area-inset-right,0px))));font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#resetBtn{position:fixed;z-index:4;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 62px);left:max(16px,var(--sa-left,env(safe-area-inset-left,0px)));height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;font-weight:700;padding:0 14px}
 #stick{position:fixed;z-index:3;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(243,246,249,.35);background:rgba(243,246,249,.06);pointer-events:none;transition:opacity .15s}
 #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(243,246,249,.55)}
-#dashBtn{position:fixed;z-index:3;pointer-events:none;width:112px;height:112px;border-radius:50%;right:calc(max(16px,env(safe-area-inset-right,0px)) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 30px);background:rgba(58,98,255,.38);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-family:var(--display);font-weight:900;font-size:25px;letter-spacing:.05em;transition:transform .08s,opacity .15s}
+#dashBtn{position:fixed;z-index:3;pointer-events:none;width:112px;height:112px;border-radius:50%;right:calc(max(16px,var(--sa-right,env(safe-area-inset-right,0px))) + 16px);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 30px);background:rgba(58,98,255,.38);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-family:var(--display);font-weight:900;font-size:25px;letter-spacing:.05em;transition:transform .08s,opacity .15s}
 #dashBtn.t1{background:rgba(255,117,54,.42)}
 #dashBtn.press{transform:scale(.9)}
 #dashBtn.empty{opacity:.55}
@@ -133,13 +133,13 @@ kbd{font-family:var(--body);font-size:12px;font-weight:700;border:1px solid var(
 #dashBtn .pips{display:flex;gap:7px}
 #dashBtn .pip{width:13px;height:13px;border-radius:50%;border:2px solid var(--chalk)}
 #dashBtn .pip.on{background:var(--chalk)}
-#dashMeter{position:fixed;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(14,26,43,.78);border:1px solid var(--line);pointer-events:none}
+#dashMeter{position:fixed;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 18px);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(14,26,43,.78);border:1px solid var(--line);pointer-events:none}
 #dashMeter .dm-l{font-family:var(--display);font-weight:900;font-size:17px;letter-spacing:.08em;text-transform:uppercase;margin-right:2px}
 #dashMeter .seg{width:54px;height:12px;border-radius:6px;background:rgba(243,246,249,.16);overflow:hidden}
 #dashMeter .seg i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left center;transform:scaleX(1)}
 #dashMeter.t1 .seg i{background:var(--orange)}
 #dashMeter .seg.full i{box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
-#fsBtn{position:fixed;z-index:4;top:calc(env(safe-area-inset-top,0px) + 12px);left:max(16px,env(safe-area-inset-left,0px));width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;display:flex;align-items:center;justify-content:center}
+#fsBtn{position:fixed;z-index:4;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 12px);left:max(16px,var(--sa-left,env(safe-area-inset-left,0px)));width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:rgba(14,26,43,.75);color:var(--chalk);cursor:pointer;display:flex;align-items:center;justify-content:center}
 #fsBtn svg{width:20px;height:20px}
 #fsBtn:focus-visible{outline:2px solid var(--chalk)}
 .hint{margin:0;font-size:14px;line-height:1.5;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(23,40,64,.7);color:var(--chalk)}
@@ -160,7 +160,7 @@ a.back{text-decoration:none;display:inline-block}
 .joinrow{display:flex;gap:8px}
 .joinrow input{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.2em;font-family:var(--display);font-weight:900;font-size:26px;padding:8px 14px}
 .joinrow .big{flex:none}
-#toast{position:fixed;z-index:9;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--chalk);color:var(--ink);font-weight:700;padding:11px 16px;border-radius:10px;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#toast{position:fixed;z-index:9;left:50%;bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 24px);transform:translateX(-50%);background:var(--chalk);color:var(--ink);font-weight:700;padding:11px 16px;border-radius:10px;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
 @media (prefers-reduced-motion:reduce){.big,.chip,#dashBtn{transition:none}.big:hover,.big:focus-visible{transform:none}}
 </style>
 
@@ -237,6 +237,7 @@ a.back{text-decoration:none;display:inline-block}
       <button class="link fsLink" data-act="fs" hidden>Full screen</button>
       <button class="link" data-act="cam" id="camBtnHome">Camera: Auto</button>
       <button class="link ctlBtn deskOnly" data-act="ctl">Controls: Mouse</button>
+      <button class="link oriBtn" data-act="ori" hidden>In game: Landscape</button>
     </div>
     <div class="group deskOnly"><label class="lbl" for="steerIn1">A/D turn speed · Steer keys · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
   </section>
@@ -313,6 +314,7 @@ a.back{text-decoration:none;display:inline-block}
       <button class="big" data-act="restart" id="restartBtn">Restart</button>
       <button class="big" data-act="cam" id="camBtn">Camera: Auto</button>
       <button class="big ctlBtn deskOnly" data-act="ctl">Controls: Mouse</button>
+      <button class="big oriBtn" data-act="ori" hidden>In game: Landscape</button>
       <div class="group deskOnly"><label class="lbl" for="steerIn2">A/D turn speed · Steer keys · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn2" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
       <button class="big" data-act="sound" id="soundBtn">Sound: on</button>
       <button class="big" data-act="quit" id="quitBtn">Quit to menu</button>
@@ -1035,6 +1037,7 @@ ui.addEventListener('click',e=>{
   else if(a==='cam'){const order=['auto','follow','full'];settings.cam=order[(order.indexOf(settings.cam)+1)%3];store.set('cam',settings.cam);syncCamLabels();view.snap=true}
   else if(a==='fs'){FS.toggle()}
   else if(a==='ctl'){cycleCtl()}
+  else if(a==='ori'){const o=['land','flip','port'];ORI.mode=o[(o.indexOf(ORI.mode)+1)%3];store.set('orient',ORI.mode);syncOriLabels();if(ORI.locked){ORI.locked=false;try{screen.orientation.unlock()}catch{}}ORI.lockTry=0;syncOrient();toast(ORI.mode==='port'?'Matches stay upright':'Matches play sideways'+(ORI.mode==='flip'?', turned the other way':''),1800)}
   else if(a==='quit'){if(app.mode==='online')leaveMatch();else toMenu()}
   else if(a==='lobby')hostBackToLobby();
   else if(a==='again'){if(app.mode==='online')hostRematch();else if(app.mode==='free')startFree();else startLocal()}
@@ -1058,6 +1061,43 @@ document.querySelectorAll('.fsLink').forEach(b=>{b.hidden=!(FS.can||FS.ios)});
 if(FS.ios)window.LoopIOS.maybe();
 ['fullscreenchange','webkitfullscreenchange'].forEach(ev=>document.addEventListener(ev,()=>{view.snap=true;syncHud()}));
 $('fsBtn').addEventListener('click',()=>FS.toggle());
+/* ================= screen orientation: matches are sideways even with rotation lock on ================= */
+// Android: lock the screen to landscape while playing (allowed in full screen / installed).
+// Everywhere else (iPhone, or when the lock isn't allowed): if the screen is upright, draw the whole game
+// turned 90 degrees, so turning the phone sideways shows it the right way up. Menus stay as they are.
+const ORI={mode:['land','flip','port'].includes(store.get('orient','land'))?store.get('orient','land'):'land',rot:0,w:0,h:0,locked:false,lockTry:0};
+const ORI_LABEL={land:'In game: Landscape',flip:'In game: Landscape, flipped',port:'In game: Portrait'};
+function oriWanted(){return !!app.game&&app.mode!=='attract'&&ORI.mode!=='port'&&Input.touchUI}
+function syncOrient(){
+  const want=oriWanted(),so=screen.orientation;
+  if(want&&!ORI.locked&&so&&so.lock&&(FS.on()||FS.installed)&&Date.now()-ORI.lockTry>4000){
+    ORI.lockTry=Date.now();
+    try{so.lock(ORI.mode==='flip'?'landscape-secondary':'landscape-primary').then(()=>{ORI.locked=true},()=>{})}catch{}
+  }else if(!want&&ORI.locked){ORI.locked=false;try{so.unlock()}catch{}}
+  const W=innerWidth,H=innerHeight,r=want&&H>W*1.05?(ORI.mode==='flip'?-90:90):0;
+  if(r===ORI.rot&&(!r||(W===ORI.w&&H===ORI.h)))return;
+  ORI.rot=r;ORI.w=W;ORI.h=H;
+  const b=document.body.style,d=document.documentElement.style,sa=s=>`env(safe-area-inset-${s},0px)`;
+  if(!r){
+    for(const k of['position','left','top','width','height','transformOrigin','transform'])b[k]='';
+    for(const k of['--sa-left','--sa-right','--sa-top','--sa-bottom','--vh8'])d.removeProperty(k);
+  }else{
+    Object.assign(b,{position:'fixed',left:'0',top:'0',width:H+'px',height:W+'px',transformOrigin:'0 0',
+      transform:r>0?`translateX(${W}px) rotate(90deg)`:`translateY(${H}px) rotate(-90deg)`});
+    // the notch and home bar move with the turn
+    const m=r>0?{left:'top',right:'bottom',top:'right',bottom:'left'}:{left:'bottom',right:'top',top:'left',bottom:'right'};
+    for(const k in m)d.setProperty('--sa-'+k,sa(m[k]));
+    d.setProperty('--vh8',Math.round(W*.08)+'px');
+  }
+  view.snap=true;Input.stickT=null;
+}
+// screen point -> point in the (possibly turned) game layout
+function lp(x,y){return ORI.rot===90?[y,innerWidth-x]:ORI.rot===-90?[innerHeight-y,x]:[x,y]}
+function layoutW(){return ORI.rot?innerHeight:innerWidth}
+function layoutH(){return ORI.rot?innerWidth:innerHeight}
+function syncOriLabels(){document.querySelectorAll('.oriBtn').forEach(b=>{b.textContent=ORI_LABEL[ORI.mode];b.hidden=!Input.touchUI})}
+addEventListener('resize',syncOrient);addEventListener('orientationchange',()=>setTimeout(syncOrient,200));
+
 (function(){
   const h=$('installHint');if(!STANDALONE||FS.installed)return;
   const ios=/iPhone|iPod|iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -1146,16 +1186,17 @@ touchEl.addEventListener('pointerdown',e=>{
   Sfx.init();
   if(e.pointerType==='mouse'){e.preventDefault();Input.mouse.has=true;Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;if(e.button===0||e.button===2)Input.dashQ=true;return}
   e.preventDefault();
-  if(!Input.touchUI){Input.touchUI=true;syncHud()}
-  if(e.clientX<innerWidth*.5){
+  if(!Input.touchUI){Input.touchUI=true;syncHud();syncOriLabels()}
+  const[px,py]=lp(e.clientX,e.clientY);
+  if(px<layoutW()*.5){
     // a new touch on the left always takes the stick, so a stick whose finger-up got lost can never stay stuck
-    Input.stickT={id:e.pointerId,ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY};placeStick()
+    Input.stickT={id:e.pointerId,ox:px,oy:py,x:px,y:py};placeStick()
   }else{Input.dashQ=true;dashEl.classList.add('press');setTimeout(()=>dashEl.classList.remove('press'),110)}
   try{touchEl.setPointerCapture(e.pointerId)}catch{}
 },{passive:false});
 touchEl.addEventListener('pointermove',e=>{
   const s=Input.stickT;if(!s||s.id!==e.pointerId)return;
-  s.x=e.clientX;s.y=e.clientY;const dx=s.x-s.ox,dy=s.y-s.oy,d=Math.hypot(dx,dy),R=60;
+  [s.x,s.y]=lp(e.clientX,e.clientY);const dx=s.x-s.ox,dy=s.y-s.oy,d=Math.hypot(dx,dy),R=60;
   if(d>R*1.3){s.ox=s.x-dx/d*R*1.3;s.oy=s.y-dy/d*R*1.3}
   placeStick();
 });
@@ -1171,7 +1212,7 @@ window.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'){Input.mous
 touchEl.addEventListener('contextmenu',e=>e.preventDefault());
 function placeStick(){
   const s=Input.stickT;
-  if(!s){stickEl.style.left='calc(max(16px, env(safe-area-inset-left, 0px)) + 96px)';stickEl.style.top='calc(100% - env(safe-area-inset-bottom, 0px) - 110px)';stickEl.style.opacity='.45';knobEl.style.transform='';return}
+  if(!s){stickEl.style.left='calc(max(16px, var(--sa-left,env(safe-area-inset-left,0px))) + 96px)';stickEl.style.top='calc(100% - var(--sa-bottom,env(safe-area-inset-bottom,0px)) - 110px)';stickEl.style.opacity='.45';knobEl.style.transform='';return}
   stickEl.style.left=s.ox+'px';stickEl.style.top=s.oy+'px';stickEl.style.opacity='1';
   const dx=s.x-s.ox,dy=s.y-s.oy,d=Math.hypot(dx,dy),m=Math.min(d,60)/(d||1);
   knobEl.style.transform=`translate(${dx*m}px,${dy*m}px)`;
@@ -2158,6 +2199,7 @@ try{if(new URLSearchParams(location.search).get('go')==='ranked')setTimeout(rkOp
 let lastT=performance.now();
 function tickAll(t){
   const dt=Math.min(.05,Math.max(0,(t-lastT)/1000));lastT=t;Input.dt=dt||1/60;
+  syncOrient();
   pollPad(dt);
   if(Net.match){if(Net.match.role==='host')hostFrame(dt);else clientFrame(dt)}
   const g=app.game;
@@ -2182,7 +2224,7 @@ const BgClock=(()=>{
   document.addEventListener('visibilitychange',sync);
   return{sync,ok:!!w};
 })();
-syncCamLabels();syncCtlLabels();syncSteer();
+syncCamLabels();syncCtlLabels();syncSteer();syncOriLabels();
 if(!matchMedia('(any-pointer:fine)').matches)document.querySelectorAll('.deskOnly').forEach(b=>{b.hidden=true});
 startAttract();show('home');applyUrlParams();
 try{if(/[?&]debug\b/.test(location.search)||localStorage.getItem('lb.debug')==='1')window.__lb={app,Net,view}}catch{}
