@@ -237,7 +237,7 @@ a.back{text-decoration:none;display:inline-block}
 <canvas id="ov"></canvas>
 <div id="labels"></div>
 <div id="touch" hidden></div>
-<div id="tedit" hidden><div class="tebar"><b>Drag a button to move it · tap one to pick it</b><div class="tesz"><span id="teWhich">Dash</span><input type="range" class="rngIn" id="teSize" min="60" max="170" step="5" value="100" aria-label="Button size"><span id="teSizeV">100%</span></div><button class="sm" id="teDef">Default</button><button class="sm" id="teDone">Done</button></div></div>
+<div id="tedit" hidden><div class="tebar"><b>Drag any button to move it · tap one to pick it, then size it</b><div class="tesz"><span id="teWhich">Dash</span><input type="range" class="rngIn" id="teSize" min="60" max="170" step="5" value="100" aria-label="Button size"><span id="teSizeV">100%</span></div><button class="sm" id="teDef">Default</button><button class="sm" id="teDone">Done</button></div></div>
 <div id="stick" hidden><div id="knob"></div></div>
 <div id="hopBtn" class="tbtn" hidden>HOP</div>
 <div id="dashBtn" class="tbtn" hidden><svg class="prog" viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="55"/><circle class="bar" id="dashProg" cx="60" cy="60" r="55" pathLength="100"/></svg><span>DASH</span><div class="pips"><span class="pip on"></span><span class="pip on"></span></div></div>
@@ -350,6 +350,7 @@ a.back{text-decoration:none;display:inline-block}
     <div class="group deskOnly"><div class="lbl">Controls</div><div class="chips" data-set="ctl"><button class="chip" data-v="mouse">Mouse</button><button class="chip" data-v="steer">Steer keys</button><button class="chip" data-v="classic">Classic</button></div></div>
     <div class="group deskOnly"><label class="lbl" for="steerIn1">Steer keys turn speed · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
     <div class="group deskOnly"><div class="lbl">Keys · click one, then press the new key</div><div class="kblist" id="keyList"></div><div class="row2"><button class="sm" id="keysReset">Default keys</button></div></div>
+    <div class="group" id="padGroup"><div class="lbl">Controller · select one, then press the button</div><p class="note" id="padNote" style="margin:0"></p><div class="kblist" id="padList"></div><div class="row2"><button class="sm" id="padReset">Default buttons</button></div></div>
     <button class="big fsLink" data-act="fs" hidden>Full screen</button>
   </section>
 
@@ -1212,11 +1213,12 @@ $('volIn').addEventListener('change',()=>{Sfx.init();Sfx.tick()});
 // ----- the screen
 let setFrom='home';
 function openSettings(){setFrom=curScreen==='pause'?'pause':'home';syncSettings();show('settings')}
-function closeSettings(){kbWait=null;show(setFrom)}
+function closeSettings(){kbWait=null;pbWait=null;show(setFrom)}
 function syncSettings(){
   setVol(Sfx.vol,false);syncChips();syncSteer();renderKeys();syncOriLabels();syncCamChips();
   const touch=Input.touchUI||matchMedia('(pointer:coarse)').matches;
   document.querySelectorAll('#s-settings .touchOnly').forEach(e=>{e.hidden=!touch});
+  renderPad();$('padGroup').hidden=!(matchMedia('(any-pointer:fine)').matches||padConnected());
 }
 document.querySelectorAll('#s-settings [data-set="ctl"]').forEach(g=>g.addEventListener('click',()=>{Input.steerH=null;syncCtlLabels()}));
 $('setOri').addEventListener('click',e=>{
@@ -1267,13 +1269,57 @@ window.addEventListener('keydown',e=>{
   store.set('keys',KB);renderKeys();
 },true);
 $('keysReset').addEventListener('click',()=>{KB=loadKB(null);store.set('keys',null);kbWait=null;renderKeys();toast('Keys are back to default',1500)});
+// ----- controller: two buttons per action; the left stick and D-pad always move
+const PB_ACTS=HAS_HOP?[['dash','Dash'],['hop','Hop'],['cam','Ball cam'],['reset','Reset orb (free play)'],['pause','Pause']]:[['dash','Dash'],['reset','Reset orb (free play)'],['pause','Pause']];
+const PB_DEF=HAS_HOP?{dash:[2,7],hop:[0,-1],cam:[3,-1],reset:[1,-1],pause:[9,-1]}:{dash:[0,7],reset:[3,-1],pause:[9,-1]};
+const PADNAMES=['A / ✕','B / ○','X / □','Y / △','LB / L1','RB / R1','LT / L2','RT / R2','View / Share','Menu / Options','L3','R3','D-pad ↑','D-pad ↓','D-pad ←','D-pad →','Home'];
+function loadPB(raw){const o={};for(const[a]of PB_ACTS){const v=raw&&Array.isArray(raw[a])?raw[a]:PB_DEF[a];o[a]=[0,1].map(i=>Number.isInteger(v[i])&&v[i]>=0&&v[i]<32?v[i]:-1)}return o}
+let PB=loadPB(store.get('padButtons',null)),pbWait=null;
+const padName=i=>i<0?'—':PADNAMES[i]||'Button '+i;
+function padConnected(){try{return [...(navigator.getGamepads?navigator.getGamepads():[])].some(g=>g&&g.connected)}catch{return false}}
+function renderPad(){
+  const box=$('padList');box.textContent='';
+  for(const[a,label]of PB_ACTS){
+    const row=document.createElement('div');row.className='krow';
+    const l=document.createElement('span');l.className='kl';l.textContent=label;row.append(l);
+    for(const i of[0,1]){
+      const b=document.createElement('button'),w=pbWait&&pbWait.a===a&&pbWait.i===i;
+      b.type='button';b.className='kbtn pbtn'+(w?' wait':'');b.dataset.a=a;b.dataset.i=i;
+      b.textContent=w?'Press a button':padName(PB[a][i]);
+      b.setAttribute('aria-label',`${label}, controller button ${i+1}: ${PB[a][i]>=0?padName(PB[a][i]):'none'}. Activate, then press the new button on the controller.`);
+      row.append(b);
+    }
+    box.append(row);
+  }
+  const on=padConnected();
+  $('padNote').textContent=on?'Left stick or D-pad moves. In menus, A chooses and B goes back.':'No controller found. Connect one and press any button on it.';
+}
+$('padList').addEventListener('click',e=>{const b=e.target.closest('.pbtn');if(!b)return;e.stopPropagation();pbWait={a:b.dataset.a,i:+b.dataset.i,t:performance.now()};kbWait=null;renderPad();renderKeys()});
+document.addEventListener('click',e=>{if(pbWait&&!e.target.closest('.pbtn')){pbWait=null;renderPad()}});
+window.addEventListener('keydown',e=>{if(pbWait&&e.code==='Escape'){e.preventDefault();e.stopImmediatePropagation();pbWait=null;renderPad()}},true);
+// called by pollPad: the next button pressed goes to the binding and nowhere else
+function padBind(p,edge){
+  if(!pbWait)return false;
+  if(performance.now()-pbWait.t<250)return true;
+  for(let i=0;i<p.buttons.length;i++)if(edge(i)){
+    const{a,i:slot}=pbWait;pbWait=null;
+    for(const k in PB)PB[k]=PB[k].map(c=>c===i?-1:c);PB[a][slot]=i;
+    store.set('padButtons',PB);renderPad();break;
+  }
+  return true;
+}
+$('padReset').addEventListener('click',()=>{PB=loadPB(null);store.set('padButtons',null);pbWait=null;renderPad();toast('Controller buttons are back to default',1500)});
+addEventListener('gamepadconnected',()=>{if(curScreen==='settings')syncSettings()});
+
 // ----- touch buttons: each can be moved and resized; positions are fractions of the play area
-const TB_KEYS=HAS_HOP?['dash','hop']:['dash'];
-function loadTL(raw){const o={};for(const k of TB_KEYS){const t=raw&&raw[k];o[k]=t&&Number.isFinite(t.x)&&Number.isFinite(t.y)?{x:clamp(t.x,0,1),y:clamp(t.y,0,1),s:clamp(num(t.s,1),.6,1.7)}:null}return o}
+const TB_KEYS=HAS_HOP?['dash','hop']:['dash'];                      // buttons a touch can press
+const ED_KEYS=TB_KEYS.concat(['reset'],HAS_HOP?['cam']:[]);           // everything the editor can move
+const ED_NAMES={dash:'Dash',hop:'Hop',reset:'Reset orb',cam:'Ball cam'};
+function loadTL(raw){const o={};for(const k of ED_KEYS){const t=raw&&raw[k];o[k]=t&&Number.isFinite(t.x)&&Number.isFinite(t.y)?{x:clamp(t.x,0,1),y:clamp(t.y,0,1),s:clamp(num(t.s,1),.6,1.7)}:null}return o}
 let TL=loadTL(store.get('touchLayout',null));
-function tbEl(k){return k==='hop'?$('hopBtn'):$('dashBtn')}
+function tbEl(k){return $({hop:'hopBtn',reset:'resetBtn',cam:'camBtn'}[k]||'dashBtn')}
 function applyTouchLayout(){
-  for(const k of TB_KEYS){
+  for(const k of ED_KEYS){
     const el=tbEl(k),t=TL[k],st=el.style;
     if(!t){st.left=st.top=st.right=st.bottom=st.transform=''}
     else{st.left=(t.x*100)+'%';st.top=(t.y*100)+'%';st.right='auto';st.bottom='auto';st.transform=`translate(-50%,-50%) scale(${t.s})`}
@@ -1292,26 +1338,27 @@ function openTouchEdit(){
   TE.on=true;TE.sel='dash';TE.drag=null;
   show(null);
   $('tedit').hidden=false;syncHud();syncOrient();
-  for(const k of TB_KEYS)tbEl(k).hidden=false;stickEl.hidden=false;placeStick();
+  for(const k of ED_KEYS)tbEl(k).hidden=false;stickEl.hidden=false;placeStick();
   teSelect('dash');
 }
 function closeTouchEdit(){
   TE.on=false;TE.drag=null;$('tedit').hidden=true;
-  for(const k of TB_KEYS)tbEl(k).classList.remove('tesel');
-  store.set('touchLayout',TB_KEYS.some(k=>TL[k])?TL:null);
+  for(const k of ED_KEYS)tbEl(k).classList.remove('tesel');
+  store.set('touchLayout',ED_KEYS.some(k=>TL[k])?TL:null);
   syncOrient();openSettings();syncHud();
 }
 function teSelect(k){
-  TE.sel=k;for(const q of TB_KEYS)tbEl(q).classList.toggle('tesel',q===k);
+  TE.sel=k;for(const q of ED_KEYS)tbEl(q).classList.toggle('tesel',q===k);
   const t=TL[k];$('teSize').value=Math.round((t?t.s:1)*100);$('teSizeV').textContent=Math.round((t?t.s:1)*100)+'%';
-  $('teWhich').textContent=k==='hop'?'Hop':'Dash';
+  $('teWhich').textContent=ED_NAMES[k];
 }
 function teEnsure(k){if(!TL[k]){const g=tbGeom(k),W=layoutW(),H=layoutH();TL[k]={x:g?g.x/W:.85,y:g?g.y/H:.8,s:1}}return TL[k]}
 $('tedit').addEventListener('pointerdown',e=>{
   if(e.target.closest('.tebar'))return;
   e.preventDefault();
-  const[px,py]=lp(e.clientX,e.clientY),k=touchHit(px,py,false)||touchHit(px,py,true);
-  const g=tbGeom(k);if(!g)return;
+  const[px,py]=lp(e.clientX,e.clientY);
+  let k=null,bd=1e9;for(const q of ED_KEYS){const g=tbGeom(q);if(!g)continue;const d=Math.hypot(px-g.x,py-g.y)/g.r;if(d<bd){bd=d;k=q}}
+  const g=k&&tbGeom(k);if(!g)return;
   if(Math.hypot(px-g.x,py-g.y)>g.r*2.2){teSelect(k);return}
   teSelect(k);const t=teEnsure(k);
   TE.drag={id:e.pointerId,k,ox:px-t.x*layoutW(),oy:py-t.y*layoutH()};
@@ -1375,7 +1422,7 @@ function syncHud(){
   $('fsBtn').hidden=!(playing&&(FS.can||FS.ios)&&!FS.installed);
   labelsEl.hidden=app.mode==='attract'||app.mode==='free';
   if(!playing){Input.stickT=null;Input.keys.clear();document.body.classList.remove('replaying');$('replayUI').hidden=true;$('skipBtn').hidden=true}
-  if(TE&&TE.on){stickEl.hidden=false;for(const k of TB_KEYS)tbEl(k).hidden=false}
+  if(TE&&TE.on){stickEl.hidden=false;for(const k of ED_KEYS)tbEl(k).hidden=false}
 }
 function myName(){const v=($('nameIn').value||'').trim().slice(0,14);return v||store.get('name','')||'Player'}
 $('nameIn').value=store.get('name','');
@@ -1506,12 +1553,14 @@ function pollPad(dt){
   const pads=navigator.getGamepads?navigator.getGamepads():[];let p=null;
   for(const g of pads)if(g&&g.connected){p=g;break}
   Input.pad=p;if(!p)return;
-  const b=i=>!!(p.buttons[i]&&p.buttons[i].pressed),prev=Input.padPrev,edge=i=>b(i)&&!prev[i];
+  const b=i=>!!(p.buttons[i]&&p.buttons[i].pressed),prev=Input.padPrev,edge=i=>b(i)&&!prev[i],pe=a=>PB[a].some(i=>i>=0&&edge(i));
+  if(padBind(p,edge)){Input.padPrev=p.buttons.map((_,i)=>b(i));return}
   if(inPlay()){
-    if(edge(0))Input.hopQ=true;
-    if(edge(2)||edge(5)||edge(7))Input.dashQ=true;
-    if(edge(3))toggleCam();
-    if(edge(9))openPause();
+    if(pe('hop'))Input.hopQ=true;
+    if(pe('dash'))Input.dashQ=true;
+    if(pe('cam'))toggleCam();
+    if(pe('reset')&&app.mode==='free')app.game.respawnOrb(true);
+    if(pe('pause'))openPause();
     if(Input.touchUI&&(Math.abs(p.axes[0]||0)>.3||b(0))){Input.touchUI=false;syncHud()}
   }else if(!ui.hidden){
     Input.navT-=dt;const ay=p.axes[1]||0;
