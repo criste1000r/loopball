@@ -931,7 +931,7 @@ function botDecide(g,r,P){
 /* ================= audio ================= */
 const Sfx={c:null,on:store.get('sound',true),last:0,
   init(){if(this.c)return;try{this.c=new(window.AudioContext||window.webkitAudioContext)()}catch{this.c=null}},
-  tone(f,d,type,v,slide){const c=this.c;if(!c||!this.on)return;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0008,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
+  tone(f,d,type,v,slide){const c=this.c;if(!c||!this.on||document.hidden)return;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0008,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
   hit(s){const n=performance.now();if(n-this.last<45)return;this.last=n;this.tone(180+Math.min(s,1400)*.35,.07,'triangle',Math.min(.22,.04+s/5000))},
   wall(s){this.tone(120+Math.min(s,1200)*.08,.06,'sine',Math.min(.12,s/9000))},
   dash(){this.tone(560,.13,'sawtooth',.045,.45)},
@@ -2071,7 +2071,7 @@ function leaveMatch(msg){
 
 /* ================= main loop ================= */
 let lastT=performance.now();
-function frame(t){
+function tickAll(t){
   const dt=Math.min(.05,Math.max(0,(t-lastT)/1000));lastT=t;Input.dt=dt||1/60;
   pollPad(dt);
   if(Net.match){if(Net.match.role==='host')hostFrame(dt);else clientFrame(dt)}
@@ -2082,9 +2082,21 @@ function frame(t){
     g.tick(dt);
   }
   if(app.game){handleEvents(app.game);updateFx(dt)}
-  render(dt);updateHud();
-  requestAnimationFrame(frame);
+  if(!document.hidden){render(dt);updateHud()}
 }
+function frame(t){tickAll(t);requestAnimationFrame(frame)}
+// Browsers stop animation frames while a window is minimized or hidden, which would freeze a hosted
+// match for everyone. During a match a tiny worker keeps a 60 Hz clock going so play continues.
+const BgClock=(()=>{
+  let w=null;
+  try{
+    w=new Worker(URL.createObjectURL(new Blob(['let t=0;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}'],{type:'text/javascript'})));
+    w.onmessage=()=>{if(document.hidden)tickAll(performance.now())};
+  }catch{w=null}
+  const sync=()=>{if(w)w.postMessage(document.hidden&&Net.match?1000/60:0)};
+  document.addEventListener('visibilitychange',sync);
+  return{sync,ok:!!w};
+})();
 syncCamLabel();syncCtlLabels();syncSteer();
 if(!matchMedia('(any-pointer:fine)').matches)document.querySelectorAll('.deskOnly').forEach(b=>{b.hidden=true});
 if(!initGL()){$('noGL').hidden=false;$('homeBtns').hidden=true}
