@@ -17,6 +17,33 @@ Play **2D** or **3D**, against bots or with friends online.
 
 Matches are private by default (code only). Tap **Make public** to list yours under Open matches.
 
+## Ranked
+
+Ranked play is in both games (1v1, 2v2, 3v3, each with its own rank). There are no accounts: each browser
+keeps a private key, and the **Star Chart** on the main page shows a recovery code that restores your ranks
+on another device.
+
+- The server hosts every ranked match, so results can't be faked from a browser.
+- Ratings work like Elo/MMR: beating a higher-rated team earns more, losing to a lower-rated team costs more.
+  Five placement matches count extra, then each match moves you about ±11 at even odds.
+- Ranks: Stardust, Comet, Moon, Planet, Star, Nova and Pulsar (three divisions each), then Supernova, Quasar
+  and Singularity. The top three have no divisions, and the bots there think ahead about every dash and turn.
+- If nobody else is searching, bots of your rank fill the match after a few seconds.
+- The main page has the leaderboards (top 100 per game and playlist).
+
+### Keep ranks safe with Neon (free)
+
+Render's free server forgets its files whenever it restarts, so ranks need a database. Neon's free plan is enough.
+
+1. Sign up at neon.tech (free, no card). Create a project (any name, region **AWS US East**, close to Render Virginia).
+2. On the project dashboard click **Connect** and copy the connection string (starts with `postgresql://`).
+3. In Render, open your loopball service → **Environment** → **Add environment variable**:
+   key `DATABASE_URL`, value: the connection string. Save; Render redeploys.
+4. Check `https://<your-site>/api/health`: `"store":{"kind":"neon"...}` means it's connected.
+
+The server creates its one table by itself. Without `DATABASE_URL` it still works, but keeps ranks in a local file
+that is wiped on every restart.
+
 ## Put it online for free (Render)
 
 Render's free plan runs this site, including online play.

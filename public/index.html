@@ -73,6 +73,57 @@ input[type=text]:focus{outline:none;border-color:var(--chalk)}
 .how b{display:block;font-family:var(--display);font-size:22px;text-transform:uppercase;letter-spacing:.03em}
 .how span{color:var(--muted);font-size:15px}
 footer{color:var(--muted);font-size:13px}
+.btn.rk{background:linear-gradient(90deg,#2a1d4f,#3b2a6e);border-color:#6a52c9}
+.btn.rk:hover,.btn.rk:focus-visible{border-color:var(--chalk)}
+.btn.sm{font-size:16px;padding:8px 14px}
+.ranked{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}
+@media (max-width:860px){.ranked{grid-template-columns:1fr}}
+.sh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sh h2,.sky h2{font-family:var(--display);font-weight:900;font-size:38px;line-height:1;margin:0;text-transform:uppercase;letter-spacing:.02em}
+.sh .sub{color:var(--muted);font-size:14px}
+.note{margin:0;color:var(--muted)}
+.chart{display:grid;grid-template-columns:auto repeat(3,1fr);gap:8px;align-items:stretch}
+.chart .gl{font-family:var(--display);font-weight:900;font-size:22px;align-self:center;padding-right:4px}
+.chart .ml{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:700;text-align:center}
+.tile{border:1px solid var(--line);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(14,26,43,.5);min-width:0;text-align:center}
+.tile .n{font-weight:700;font-size:14px;line-height:1.15}
+.tile .r{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tile .pb{width:80%;height:5px;border-radius:3px;background:rgba(243,246,249,.12);overflow:hidden}
+.tile .pb i{display:block;height:100%}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 0}
+@media (max-width:460px){.totals{grid-template-columns:repeat(2,1fr)}}
+.totals div{background:rgba(14,26,43,.5);border-radius:10px;padding:8px 10px}
+.totals dt{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.totals dd{margin:0;font-family:var(--display);font-weight:900;font-size:26px;line-height:1.1}
+.keep summary{cursor:pointer;font-weight:700;color:var(--chalk)}
+.keep p{color:var(--muted);font-size:14px;margin:8px 0}
+.keep .lbl{display:block;margin-top:10px}
+.coderow{display:flex;gap:8px;margin-top:6px}
+.coderow code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;padding:9px 12px;border-radius:10px;background:var(--stadium);border:1px solid var(--line)}
+.coderow input{font-size:15px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs .sp{flex:1}
+.tab{font-family:var(--display);font-weight:900;font-size:18px;padding:6px 12px;border-radius:9px;border:2px solid var(--line);background:transparent;color:var(--chalk);cursor:pointer}
+.tab:hover,.tab:focus-visible{border-color:var(--chalk);outline:none}
+.tab[aria-pressed="true"]{background:var(--chalk);color:var(--ink);border-color:var(--chalk)}
+.lb{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:520px;overflow:auto}
+.lb li{display:grid;grid-template-columns:2.2em 30px 1fr auto;align-items:center;gap:8px;padding:6px 8px;border-radius:9px}
+.lb li:nth-child(odd){background:rgba(14,26,43,.45)}
+.lb li.me{outline:2px solid var(--blue)}
+.lb .p{font-family:var(--display);font-weight:900;font-size:20px;text-align:right;color:var(--muted)}
+.lb li:nth-child(-n+3) .p{color:var(--chalk)}
+.lb .who{min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.lb .who b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb .who span{font-size:12px;color:var(--muted)}
+.lb .mm{font-variant-numeric:tabular-nums;font-weight:700}
+.lb .empty{display:block;color:var(--muted);background:none}
+.sky{display:flex;flex-direction:column;gap:12px}
+.ladder{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
+@media (max-width:860px){.ladder{grid-template-columns:repeat(5,1fr)}}
+.ladder li{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;padding:10px 4px;border-radius:12px;background:rgba(23,40,64,.55);border:1px solid var(--line);min-width:0}
+.ladder li.top{background:rgba(40,28,70,.55);border-color:rgba(160,130,255,.35)}
+.ladder b{font-size:13px;line-height:1.1}
+.ladder span{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}.btn:hover{transform:none}}
 </style>
 </head>
@@ -106,6 +157,7 @@ footer{color:var(--muted);font-size:13px}
         <p>The original, seen from above. Fast, readable, and perfect on a phone held either way.</p>
         <div class="acts">
           <a class="btn warm wide" href="/2d/?host=1">Host for friends <span class="k">Get a code</span></a>
+          <a class="btn rk wide" href="/2d/?go=ranked">Ranked <span class="k">1v1 · 2v2 · 3v3</span></a>
           <a class="btn primary" href="/2d/?go=bots">Vs bots</a>
           <a class="btn" href="/2d/?go=online">Open matches</a>
           <a class="btn" href="/2d/?go=free">Free play</a>
@@ -120,6 +172,7 @@ footer{color:var(--muted);font-size:13px}
         <p>Real height. Hop, scoop the orb into the air and dash for aerial shots, with ball cam and goal replays.</p>
         <div class="acts">
           <a class="btn warm wide" href="/3d/?host=1">Host for friends <span class="k">Get a code</span></a>
+          <a class="btn rk wide" href="/3d/?go=ranked">Ranked <span class="k">1v1 · 2v2 · 3v3</span></a>
           <a class="btn primary" href="/3d/?go=bots">Vs bots</a>
           <a class="btn" href="/3d/?go=online">Open matches</a>
           <a class="btn" href="/3d/?go=free">Free play</a>
@@ -131,6 +184,33 @@ footer{color:var(--muted);font-size:13px}
 
   <p class="hint" id="installHint" hidden></p>
 
+  <div class="ranked">
+    <section class="panel" id="stars" aria-labelledby="starsH">
+      <div class="sh"><h2 id="starsH">Star Chart</h2><span class="sub" id="starsWho"></span></div>
+      <p class="note" id="starsEmpty" hidden>Play a ranked match in 2D or 3D and your ranks show up here. Five placement matches reveal your rank in each playlist.</p>
+      <div class="chart" id="chart"></div>
+      <dl class="totals" id="totals"></dl>
+      <details class="keep">
+        <summary>Keep your ranks</summary>
+        <p>There are no accounts: your ranks live in this browser. Save this code somewhere safe. It brings your ranks back if you clear your browser, and moves them to another phone or computer.</p>
+        <div class="coderow"><code id="recCode">Play a ranked match first</code><button class="btn sm" id="recCopy">Copy</button></div>
+        <label class="lbl" for="restoreIn">Restore from a code</label>
+        <div class="coderow"><input type="text" id="restoreIn" placeholder="LB-…" autocomplete="off" spellcheck="false"><button class="btn sm" id="restoreBtn">Restore</button></div>
+        <p class="msg" id="keepMsg" aria-live="polite"></p>
+      </details>
+    </section>
+    <section class="panel" aria-labelledby="lbH">
+      <div class="sh"><h2 id="lbH">Leaderboard</h2><span class="sub" id="lbCount"></span></div>
+      <div class="tabs" role="group" aria-label="Game"><button class="tab" data-g="2d" aria-pressed="true">2D</button><button class="tab" data-g="3d" aria-pressed="false">3D</button><span class="sp"></span><button class="tab" data-m="1" aria-pressed="true">1v1</button><button class="tab" data-m="2" aria-pressed="false">2v2</button><button class="tab" data-m="3" aria-pressed="false">3v3</button></div>
+      <ol class="lb" id="lb"></ol>
+    </section>
+  </div>
+
+  <section class="sky" aria-labelledby="skyH">
+    <div class="sh"><h2 id="skyH">The ranks</h2><span class="sub">Seven ranks with three divisions each, then three peaks with no divisions at all.</span></div>
+    <ol class="ladder" id="ladder"></ol>
+  </section>
+
   <div class="how">
     <div><b>Host</b><span>Pick 2D or 3D and tap Host for friends. You get a 5-letter code and an invite link to send.</span></div>
     <div><b>Set it up</b><span>Choose 1v1, 2v2 or 3v3, move players between teams, or put all your friends against bots.</span></div>
@@ -139,6 +219,7 @@ footer{color:var(--muted);font-size:13px}
 
   <footer>Phone: left thumb steers, right side dashes. Computer: mouse or keys, pick in Controls. Controllers work too.</footer>
 </div>
+<script src="/ranks.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -163,6 +244,91 @@ $('join').addEventListener('click',()=>join(code.value));
 code.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();join(code.value)}});
 // invite links land here as /?join=CODE
 try{const q=new URLSearchParams(location.search),j=q.get('join');if(j){code.value=j.toUpperCase();history.replaceState(null,'','/');join(j)}}catch{}
+// ---------- ranks: Star Chart, leaderboard, ladder ----------
+const R=window.LoopRanks;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ladder(){
+  const ol=$('ladder');ol.textContent='';
+  R.TIERS.forEach((t,i)=>{
+    const step=R.STEPS.findIndex(s=>s.t===i),r=R.fromStep(step),li=document.createElement('li');
+    if(!t.divs)li.className='top';
+    li.innerHTML=R.icon(Object.assign({},r,{d:0}),48)+`<b style="color:${t.color}">${t.name}</b><span>${R.STEPS[step].min?R.STEPS[step].min.toLocaleString()+'+':'start'}</span>`;
+    ol.append(li);
+  });
+}
+ladder();
+let ME=null;
+async function loadMe(){
+  const me=R.identity(false);
+  $('recCode').textContent=me?R.recoveryCode(me):'Play a ranked match first';
+  if(!me){ME=null;chart();return}
+  try{
+    const r=await fetch('/api/me',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pid:me.id,key:me.key}),cache:'no-store'});
+    const j=await r.json();
+    ME=j&&j.m?j:j&&j.error?{bad:true,m:{}}:{m:{}};
+  }catch{ME=null}
+  chart();lb();
+}
+function chart(){
+  const c=$('chart'),tot=$('totals');c.textContent='';tot.textContent='';
+  const m=ME&&ME.m||{},keys=Object.keys(m);
+  $('starsEmpty').hidden=keys.length>0;
+  $('starsWho').textContent=ME&&ME.nm&&keys.length?ME.nm:'';
+  if(ME&&ME.bad){$('starsEmpty').hidden=false;$('starsEmpty').textContent='The ranked key in this browser doesn’t match the server. Restore your code below.'}
+  c.append(Object.assign(document.createElement('span')));
+  for(const md of[1,2,3]){const l=document.createElement('span');l.className='ml';l.textContent=md+'v'+md;c.append(l)}
+  for(const g of['2d','3d']){
+    const gl=document.createElement('span');gl.className='gl';gl.textContent=g.toUpperCase();c.append(gl);
+    for(const md of[1,2,3]){
+      const s=m[g+md],t=document.createElement('div');t.className='tile';
+      if(!s){t.innerHTML=R.icon(R.rankOf(0,false),40)+'<span class="n">Unranked</span><span class="r">Not played</span>'}
+      else{
+        const placed=s.pl>=R.PLACEMENTS,rk=R.rankOf(s.mmr,placed);
+        t.innerHTML=R.icon(rk,44)+`<span class="n" style="color:${placed?rk.color:'inherit'}">${esc(placed?rk.name:'Placement '+s.pl+'/'+R.PLACEMENTS)}</span>`+
+          `<span class="r">${placed?s.mmr.toLocaleString()+' · ':''}${s.w}W ${s.l}L</span>`+
+          `<span class="pb"><i style="width:${Math.round((placed?rk.progress:s.pl/R.PLACEMENTS)*100)}%;background:${placed?rk.color:'#93a6bc'}"></i></span>`;
+        t.title=placed?(rk.next?`${rk.next-s.mmr} to ${rk.nextName}`:'Top rank')+(s.pos?` · #${s.pos} on the leaderboard`:''):'Finish placement matches to get your rank';
+      }
+      c.append(t);
+    }
+  }
+  if(!keys.length)return;
+  let w=0,l=0,g=0,mvp=0,best=0,bst=0,peak=null;
+  for(const k of keys){const s=m[k];w+=s.w;l+=s.l;g+=s.g;mvp+=s.mvp;best=Math.max(best,s.best||0);bst=Math.max(bst,s.bst||0);if(s.pl>=R.PLACEMENTS){const r=R.rankOf(s.peak);if(!peak||r.step>peak.step)peak=r}}
+  const items=[['Wins',w],['Win rate',w+l?Math.round(w/(w+l)*100)+'%':'–'],['Goals',g],['MVPs',mvp],['Hardest goal',best?best+' km/h':'–'],['Best streak',bst],['Peak rank',peak?peak.name:'–'],['Matches',w+l]];
+  for(const[a,b]of items){const d=document.createElement('div');d.innerHTML=`<dt>${a}</dt><dd>${esc(b)}</dd>`;tot.append(d)}
+}
+let LB={g:'2d',m:1};
+async function lb(){
+  const ol=$('lb');
+  try{
+    const r=await fetch(`/api/leaderboard?g=${LB.g}&m=${LB.m}`,{cache:'no-store'});const j=await r.json();
+    ol.textContent='';
+    $('lbCount').textContent=j.total?`${j.total} ranked ${j.total===1?'player':'players'}`:'';
+    if(!j.rows.length){const li=document.createElement('li');li.className='empty';li.textContent=`Nobody has finished placements in ${LB.g.toUpperCase()} ${LB.m}v${LB.m} yet. The top spot is open.`;ol.append(li);return}
+    const me=R.identity(false),myId=me?me.id.slice(0,6):null;
+    j.rows.forEach((row,i)=>{
+      const li=document.createElement('li'),rk=R.fromStep(row.s);
+      if(row.id===myId)li.className='me';
+      li.innerHTML=`<span class="p">${i+1}</span>${R.icon(rk,30)}<span class="who"><b>${esc(row.n)}</b><span style="color:${rk.color}">${esc(rk.name)}</span></span><span class="mm">${row.mmr.toLocaleString()}<span style="color:var(--muted);font-weight:400;font-size:12px"> · ${row.w}–${row.l}</span></span>`;
+      ol.append(li);
+    });
+  }catch{ol.innerHTML='<li class="empty">Can’t load the leaderboard right now.</li>'}
+}
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab');if(!b)return;
+  if(b.dataset.g)LB.g=b.dataset.g;if(b.dataset.m)LB.m=+b.dataset.m;
+  document.querySelectorAll('.tab[data-g]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.g===LB.g)));
+  document.querySelectorAll('.tab[data-m]').forEach(x=>x.setAttribute('aria-pressed',String(+x.dataset.m===LB.m)));
+  lb();
+});
+$('recCopy').addEventListener('click',async()=>{const me=R.identity(false);if(!me)return;try{await navigator.clipboard.writeText(R.recoveryCode(me));$('keepMsg').textContent='Copied. Keep it somewhere safe.'}catch{$('keepMsg').textContent='Select the code and copy it by hand.'}});
+$('restoreBtn').addEventListener('click',()=>{
+  const v=$('restoreIn').value;
+  if(!R.restore(v)){$('keepMsg').textContent='That doesn’t look like a Loopball code. It starts with LB-.';return}
+  $('restoreIn').value='';$('keepMsg').textContent='Restored. Your ranks are back on this device.';loadMe();
+});
+loadMe();setInterval(lb,60000);
 // players online
 async function stats(){try{const r=await fetch('/api/stats',{cache:'no-store'});const j=await r.json();const n=j.online|0;$('onlineN').textContent=n+(n===1?' player online':' players online');$('online').hidden=false}catch{}}
 stats();setInterval(stats,20000);

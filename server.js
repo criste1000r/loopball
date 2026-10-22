@@ -6,6 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+const { createStore } = require('./store.js');
+const { createRanked } = require('./ranked.js');
+
 const PORT = Number(process.env.PORT) || 3000;
 // Testing aid only: SIM_LAG_MS adds that much delay each way to every message (leave unset in production).
 const SIM_LAG = Math.max(0, Number(process.env.SIM_LAG_MS) || 0);
@@ -39,7 +42,28 @@ const server = http.createServer((req, res) => {
   }
   if (p === '/api/stats') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify({ online: byId.size }));
+    const rs = ranked ? ranked.stats() : null;
+    return res.end(JSON.stringify({ online: byId.size, queues: rs ? rs.queues : {}, live: rs ? rs.live : 0 }));
+  }
+  if (p === '/api/leaderboard') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const game = q.get('g') === '3d' ? '3d' : '2d', md = [1, 2, 3].includes(+q.get('m')) ? +q.get('m') : 1;
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify(ranked ? ranked.leaderboard(game, md) : { game, md, total: 0, rows: [] }));
+  }
+  if (p === '/api/me' && req.method === 'POST') {
+    let body = '';
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy(); });
+    req.on('end', () => {
+      let j = null; try { j = JSON.parse(body); } catch {}
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify(j && ranked ? ranked.profile(j.pid, j.key) : { error: 'bad' }));
+    });
+    return;
+  }
+  if (p === '/api/health') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify(Object.assign({ online: byId.size }, ranked ? ranked.stats() : {})));
   }
   if (p === '/2d' || p === '/3d') { res.writeHead(301, { location: p + '/' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '') }); return res.end(); }
   if (p.endsWith('/')) p += 'index.html';
@@ -154,21 +178,41 @@ function onMessage(c, raw) {
   } else if (m.t === 'leave') {
     if (typeof m.room === 'string' && m.room !== '') leaveRoom(c, m.room);
   } else if (m.t === 'pres') {
-    const room = typeof m.room === 'string' ? m.room : '';
-    const cur0 = c.rooms.get(room);
-    const p = m.p;
-    if (!cur0 || !p || typeof p !== 'object' || Array.isArray(p)) return;
-    const cur = Object.assign({}, cur0);
-    for (const k of Object.keys(p)) {
-      if (!KEY_RE.test(k) || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      if (p[k] === null) delete cur[k]; else cur[k] = p[k];
-    }
-    const s = JSON.stringify(cur);
-    if (s.length > MAX_PRES) return;
-    c.rooms.set(room, cur);
-    broadcast(room, '{"t":"pres","room":' + JSON.stringify(room) + ',"peer":"' + c.id + '","p":' + s + '}', c);
+    setPresence(c, typeof m.room === 'string' ? m.room : '', m.p, MAX_PRES);
+  } else if ((m.t === 'rq' || m.t === 'rx') && ranked) {
+    ranked.onMessage(c, m);
   }
 }
+
+function setPresence(c, room, p, limit) {
+  const cur0 = c.rooms.get(room);
+  if (!cur0 || !p || typeof p !== 'object' || Array.isArray(p)) return;
+  const cur = Object.assign({}, cur0);
+  for (const k of Object.keys(p)) {
+    if (!KEY_RE.test(k) || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+    if (p[k] === null) delete cur[k]; else cur[k] = p[k];
+  }
+  const s = JSON.stringify(cur);
+  if (s.length > limit) return;
+  c.rooms.set(room, cur);
+  broadcast(room, '{"t":"pres","room":' + JSON.stringify(room) + ',"peer":"' + c.id + '","p":' + s + '}', c);
+}
+
+/* ---------- ranked: the server joins match rooms as the host ---------- */
+const relay = {
+  virtualPeer(id) {
+    return { id, virtual: true, closed: false, rooms: new Map(), socket: { destroyed: false, write() {} }, send() {} };
+  },
+  join(c, room) { joinRoom(c, room); },
+  leave(c, room) { leaveRoom(c, room); },
+  presence(c, room, patch) { setPresence(c, room, patch, 64 * 1024); },
+  peersIn(room) { const out = new Map(); const set = rooms.get(room); if (set) for (const x of set) out.set(x.id, x.rooms.get(room) || {}); return out; },
+  sendTo(peer, obj) { const c = byId.get(peer); if (c && !c.closed) c.send(JSON.stringify(obj)); },
+  roomExists(name) { return rooms.has(name); }
+};
+const store = createStore();
+let ranked = null;
+try { ranked = createRanked({ relay, store, publicDir: PUB }); } catch (e) { console.error('Ranked play is off:', e); }
 
 function joinRoom(c, name) {
   let set = rooms.get(name);
@@ -198,6 +242,7 @@ function broadcast(name, str, except) {
 
 function onClose(c) {
   all.delete(c);
+  if (ranked) ranked.onClose(c);
   if (!c.id) return;
   for (const name of [...c.rooms.keys()]) leaveRoom(c, name);
   if (byId.get(c.id) === c) byId.delete(c.id);
@@ -212,4 +257,6 @@ setInterval(() => {
   }
 }, 25000).unref();
 
-server.listen(PORT, () => console.log('Loopball running on http://localhost:' + PORT));
+store.load().finally(() => server.listen(PORT, () => console.log('Loopball running on http://localhost:' + PORT)));
+// Render stops the old server on every deploy: save anything pending first
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { store.flush().finally(() => process.exit(0)); setTimeout(() => process.exit(0), 8000).unref(); });

@@ -161,6 +161,37 @@ a.back{text-decoration:none;display:inline-block}
 @media (prefers-reduced-motion:reduce){.big,.chip,#dashBtn{transition:none}.big:hover,.big:focus-visible{transform:none}}
 </style>
 
+<style>
+.rkmodes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rkmode{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px 9px;border-radius:12px;border:2px solid var(--line);background:transparent;color:var(--chalk);cursor:pointer;font:inherit;min-width:0}
+.rkmode:hover,.rkmode:focus-visible{border-color:var(--chalk);outline:none}
+.rkmode[aria-pressed="true"]{border-color:var(--chalk);background:rgba(243,246,249,.08)}
+.rkmode .t{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.03em;line-height:1}
+.rkmode .n{font-size:13px;font-weight:700;text-align:center;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rkmode .r{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rkq{border:2px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.rkq-top{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:900;font-size:24px;text-transform:uppercase;letter-spacing:.03em}
+.rkq-time{margin-left:auto;font-variant-numeric:tabular-nums}
+.rkq-sub{font-size:13px;color:var(--muted)}
+.rkspin{width:18px;height:18px;border-radius:50%;border:3px solid rgba(243,246,249,.25);border-top-color:var(--chalk);animation:rkspin .9s linear infinite;flex:none}
+@keyframes rkspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.rkspin{animation:none}}
+.rklink{color:var(--muted)}
+.rklink:hover{color:var(--chalk)}
+.rkres{display:flex;align-items:center;gap:14px;border:2px solid var(--line);border-radius:14px;padding:12px 14px}
+.rkres svg{flex:none}
+.rkres .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.rkres .nm{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rkres .nm b{font-family:var(--display);font-weight:900;font-size:28px;text-transform:uppercase;letter-spacing:.03em;line-height:1}
+.rkres .d{font-family:var(--display);font-weight:900;font-size:24px;line-height:1}
+.rkres .d.up{color:#57e39a}.rkres .d.down{color:#ff7a7a}
+.rkres .bar{height:8px;border-radius:5px;background:rgba(243,246,249,.14);overflow:hidden}
+.rkres .bar i{display:block;height:100%;border-radius:5px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.rkres .sub{font-size:13px;color:var(--muted)}
+.rkres .msg{font-weight:700;color:var(--chalk)}
+.rkbadge{display:inline-flex;vertical-align:middle;margin-right:4px}
+.rkbadge svg{display:block}
+</style>
 </head>
 <body>
 <canvas id="cv" aria-label="Loopball arena"></canvas>
@@ -194,6 +225,7 @@ a.back{text-decoration:none;display:inline-block}
     <div class="stack">
       <button class="big primary" data-go="bots">Play vs bots <span class="k">1v1 · 2v2 · 3v3</span></button>
       <button class="big warm" data-go="online">Online <span class="k">Play friends live</span></button>
+      <button class="big" data-go="ranked">Ranked <span class="k">Climb the stars</span></button>
       <button class="big" data-act="free">Free play <span class="k">Practice shots</span></button>
     </div>
     <p class="hint" id="installHint" hidden></p>
@@ -212,7 +244,7 @@ a.back{text-decoration:none;display:inline-block}
     <div class="group"><div class="lbl">Team size</div>
       <div class="chips" data-set="size"><button class="chip" data-v="1">1v1</button><button class="chip" data-v="2">2v2</button><button class="chip" data-v="3">3v3</button></div></div>
     <div class="group"><div class="lbl">Bot skill</div>
-      <div class="chips" data-set="diff"><button class="chip" data-v="rookie">Rookie</button><button class="chip" data-v="pro">Pro</button><button class="chip" data-v="elite">Elite</button></div></div>
+      <div class="chips" data-set="diff"><button class="chip" data-v="rookie">Rookie</button><button class="chip" data-v="pro">Pro</button><button class="chip" data-v="elite">Elite</button><button class="chip" data-v="legend">Legend</button></div></div>
     <div class="group"><div class="lbl">Match length</div>
       <div class="chips" data-set="len"><button class="chip" data-v="120">2:00</button><button class="chip" data-v="180">3:00</button><button class="chip" data-v="300">5:00</button></div></div>
     <button class="big primary" data-act="local">Kick off <span class="k">You play Blue</span></button>
@@ -240,7 +272,7 @@ a.back{text-decoration:none;display:inline-block}
     <div class="teams" id="mlTeams"><div class="team t0"><div class="lbl">Blue</div><ol id="tl0"></ol></div><div class="team t1"><div class="lbl">Orange</div><ol id="tl1"></ol></div></div>
     <div class="stack" id="hostCtl">
       <div class="group"><div class="lbl">Team size</div><div class="chips" id="mlSize"><button class="chip" data-v="1">1v1</button><button class="chip" data-v="2">2v2</button><button class="chip" data-v="3">3v3</button></div></div>
-      <div class="group"><div class="lbl">Bots fill open spots at</div><div class="chips" id="mlBot"><button class="chip" data-v="rookie">Rookie</button><button class="chip" data-v="pro">Pro</button><button class="chip" data-v="elite">Elite</button></div></div>
+      <div class="group"><div class="lbl">Bots fill open spots at</div><div class="chips" id="mlBot"><button class="chip" data-v="rookie">Rookie</button><button class="chip" data-v="pro">Pro</button><button class="chip" data-v="elite">Elite</button><button class="chip" data-v="legend">Legend</button></div></div>
       <div class="group" id="mlLenG"><div class="lbl">Match length</div>
         <div class="chips" data-set="olen"><button class="chip" data-v="120">2:00</button><button class="chip" data-v="180">3:00</button><button class="chip" data-v="300">5:00</button></div></div>
       <div class="row2"><button class="sm" id="mlFvB">Friends vs bots</button><button class="sm" id="mlPubBtn">Make public</button></div>
@@ -289,15 +321,35 @@ a.back{text-decoration:none;display:inline-block}
     <div class="final"><span class="b" id="endA">0</span><span>–</span><span class="o" id="endB">0</span></div>
     <table class="stats" id="endStats"></table>
     <p class="note" id="endNote" hidden></p>
+    <div id="rkRes" hidden></div>
     <div class="stack">
       <button class="big primary" data-act="again" id="againBtn">Play again</button>
       <button class="big" data-act="lobby" id="lobbyBtn" hidden>Back to lobby <span class="k">Teams and settings</span></button>
       <button class="big" data-act="quit" id="endQuit">Menu</button>
     </div>
   </section>
+    <section class="screen" id="s-ranked" hidden>
+    <button class="back" data-go="home">← Back</button>
+    <h2>Ranked</h2>
+    <p class="tag" style="margin:0">Win to climb from <b>Stardust</b> to <b>Singularity</b>. Beat stronger teams to climb faster. No real players around? You face bots built to play at your rank.</p>
+    <div class="group"><label class="lbl" for="rkName">Your name</label><input type="text" id="rkName" maxlength="14" autocomplete="off" spellcheck="false"></div>
+    <div class="group"><div class="lbl">Playlist</div><div class="rkmodes" id="rkModes"></div></div>
+    <p class="note" id="rkNote" hidden></p>
+    <div class="rkq" id="rkQ" hidden>
+      <div class="rkq-top"><span class="rkspin" aria-hidden="true"></span><span id="rkQText">Searching</span><span class="rkq-time" id="rkQTime">0:00</span></div>
+      <div class="rkq-sub" id="rkQSub">Looking for players near your rank…</div>
+    </div>
+    <div class="stack">
+      <button class="big primary" id="rkGo">Find match <span class="k" id="rkGoK">Ranked 1v1</span></button>
+      <button class="big" id="rkCancel" hidden>Cancel search</button>
+    </div>
+    <p class="hint"><a class="rklink" href="/#stars">Your Star Chart and the leaderboards are on the main page</a></p>
+  </section>
+
 </div>
 <div id="toast" hidden></div>
 
+<script src="/ranks.js"></script>
 <script>
 /* Loopball standalone networking: provides the same room interface the game
    uses inside Claude, backed by this site's own WebSocket server. */
@@ -351,7 +403,13 @@ window.LOOPBALL = { standalone: true };
       if (document.hidden || typeof requestAnimationFrame !== 'function') setTimeout(run, 16); else requestAnimationFrame(run);
     }
     function send(o) { if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(o)); } catch (e) {} } }
-    function fireConn() { Array.from(connFns).forEach(function (f) { try { f(connected); } catch (e) {} }); }
+    function fireConn() {
+      Array.from(connFns).forEach(function (f) { try { f(connected); } catch (e) {} });
+      if (typeof window.LOOPBALL.onConn === 'function') { try { window.LOOPBALL.onConn(connected); } catch (e) {} }
+    }
+    // extra messages for ranked play (queueing etc.)
+    window.LOOPBALL.send = function (o) { if (!connected) return false; send(o); return true; };
+    window.LOOPBALL.isConnected = function () { return connected; };
     function later() { retry++; setTimeout(connect, Math.min(8000, 500 * retry)); }
     function connect() {
       try { ws = new WebSocket(url); } catch (e) { later(); return; }
@@ -390,6 +448,8 @@ window.LOOPBALL = { standalone: true };
         setPeer(r2, m.peer, m.p && typeof m.p === 'object' ? m.p : {});
       } else if (m.t === 'left') {
         var r3 = rooms.get(m.room); if (r3 && typeof m.peer === 'string') delPeer(r3, m.peer);
+      } else if (typeof window.LOOPBALL.onMsg === 'function') {
+        try { window.LOOPBALL.onMsg(m); } catch (e) { console.error(e); }
       }
     }
     function makeApi(r) {
@@ -451,16 +511,18 @@ const STEP=1/240,CD_T=2.4,GOAL_T=2.6,KMH=0.11;
 const CREASE=190; // goal-zone radius
 const COL=['#3a62ff','#ff7536'],COL_SOFT=['#a9bbff','#ffc3a6'],TNAME=['Blue','Orange'];
 const BOTNAMES=['Vela','Kip','Moro','Tuck','Rhee','Sable','Quill','Juno','Pike','Wren','Ozzy','Lark'];
-const DIFF={
-  rookie:{spd:.78,react:.26,dash:.35,noise:46,shoot:430},
-  pro:{spd:.93,react:.11,dash:.75,noise:18,shoot:560},
-  elite:{spd:1,react:.045,dash:1,noise:5,shoot:650}
-};
+// Bot skill runs 0..1; ranked bots get theirs from their rating
+function botParams(sk){sk=clamp(sk,0,1);const L=(a,b)=>a+(b-a)*sk,S=(a,b)=>clamp((sk-a)/(b-a),0,1);
+  // the top of the ladder thinks ahead: first about when to dash, then about where to steer too
+  return{spd:L(.7,1),react:L(.34,.03),dash:L(.25,1),noise:L(70,3),shoot:L(420,700),iq:sk,hes:L(.14,0),
+    look:sk>=.4?.6:0,steer:sk>=.7?1:0,prune:600,lookP:sk>=.7?.25+.75*S(.7,1):.2+.8*S(.4,.7),lookEvery:sk>=.7?.12-.06*S(.7,1):.06}}
 const KICK={1:[[-330,0]],2:[[-330,-150],[-520,170]],3:[[-330,0],[-500,-230],[-560,230]]};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const wrap=a=>{while(a>Math.PI)a-=6.283185307179586;while(a<-Math.PI)a+=6.283185307179586;return a};
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const num=(v,d=0)=>{v=Number(v);return Number.isFinite(v)?v:d};
+// Rookie and Pro are the original bots. Elite is a step above the original Elite; Legend thinks ahead (about Supernova).
+const DIFF={rookie:{spd:.78,react:.26,dash:.35,noise:46,shoot:430},pro:{spd:.93,react:.11,dash:.75,noise:18,shoot:560},elite:botParams(.55),legend:botParams(.82)};
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const store={get(k,d){try{const v=localStorage.getItem('loopball.'+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem('loopball.'+k,JSON.stringify(v))}catch{}}};
 function shuffled(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -718,25 +780,113 @@ function assignRoles(g,dt){
   }
 }
 function botControl(g,r,dt){
-  const P=DIFF[r.diff]||DIFF.pro,ai=r.ai;
-  ai.t-=dt;
-  if(ai.t<=0){ai.t=P.react*(.7+Math.random()*.6);botDecide(g,r,P)}
+  const P=r.P||DIFF[r.diff]||DIFF.pro,ai=r.ai;
+  ai.t-=dt;if(ai.slow>0)ai.slow-=dt;
+  if(ai.t<=0){ai.t=P.react*(.7+Math.random()*.6);botDecide(g,r,P);if(Math.random()<P.hes)ai.slow=rnd(.15,.45)}
   if(ai.tx==null){r.ix=r.iy=0;return}
   const dx=ai.tx-r.x,dy=ai.ty-r.y,d=Math.hypot(dx,dy);
   if(d<16&&ai.face!=null){r.ix=Math.cos(ai.face)*.16;r.iy=Math.sin(ai.face)*.16}
-  else{const m=(ai.urgent?1:Math.min(1,d/90))*P.spd;r.ix=dx/d*m;r.iy=dy/d*m}
+  else{const m=(ai.urgent?1:Math.min(1,d/90))*P.spd*(ai.slow>0?.45:1);r.ix=dx/d*m;r.iy=dy/d*m}
+  if(P.look&&(ai.lt=(ai.lt||0)-dt)<=0){
+    ai.lt=P.lookEvery||.05;
+    const full=Math.random()<P.lookP;
+    if(full&&P.steer&&(g.size===1||r.role==='att'))lookSteer(g,r,P);
+    else if(full||P.steer){const v=lookDash(g,r,P);if(v!==null){ai.dash=v}}
+  }
+  if(ai.saT>0){ai.saT-=dt;r.ix=Math.cos(ai.sa)*P.spd;r.iy=Math.sin(ai.sa)*P.spd}
   if(ai.dash){r.dashReq=true;ai.dash=false}
+}
+// Look-ahead for strong bots: play the next moment forward with and without a dash and keep the better one.
+function simClone(g,r,prune){
+  const c=Object.create(Game.prototype),o=g.orb;
+  Object.assign(c,{size:g.size,free:g.free,authority:true,attract:false,score:g.score.slice(),time:1e9,ot:false,carrier:g.carrier,lastPlay:false,
+    phase:'play',phaseT:0,goalId:0,lastGoal:null,acc:0,events:[],fp:{last:0,best:0,goals:0}});
+  // rings too far away to matter in the next moment are left out, which keeps team games cheap
+  c.rings=[];c.byI=[];
+  for(const q of g.rings){
+    if(prune&&q!==r&&Math.hypot(q.x-r.x,q.y-r.y)>prune&&Math.hypot(q.x-o.x,q.y-o.y)>prune)continue;
+    const k={i:q.i,team:q.team,x:q.x,y:q.y,vx:q.vx,vy:q.vy,f:q.f,w:q.w,ix:q.ix,iy:q.iy,dashReq:false,ch:q.ch,chT:q.chT,cd:q.cd,dashT:q.dashT,stun:q.stun,carry:q.carry};
+    c.rings.push(k);c.byI[q.i]=k;
+  }
+  c.orb={x:o.x,y:o.y,vx:o.vx,vy:o.vy,last:o.last,trail:[]};
+  c.scored=function(team){this.lastGoal={team};this.phase='goal'};
+  return c;
+}
+function simValue(g,r,dash,T,P){
+  const c=simClone(g,r,P&&P.prune),me=c.byI[r.i],foe=goalOf(1-r.team),own=goalOf(r.team),dt=STEP*((P&&P.ss)||(g.size>1?2:1));
+  if(dash)me.dashReq=true;
+  let v=0;const n=Math.round(T/dt);
+  for(let k=0;k<n;k++){
+    c.step(dt);
+    if(c.phase==='goal'){const t=c.lastGoal.team;return (t===r.team?1000:-1000)*(1-k/n*.3)}
+    for(const e of c.events)if(e.type==='bump'){if(c.byI[e.i].team===r.team)v+=e.v===g.carrier||c.byI[e.v].carry?160:60;else v-=e.v===r.i&&r.carry?200:90}
+    c.events.length=0;
+  }
+  const o=c.orb;
+  v+=(Math.abs(own.x-o.x)-Math.abs(foe.x-o.x))*.12;
+  if(c.carrier>=0)v+=c.byI[c.carrier].team===r.team?140:-140;
+  const sp=Math.hypot(o.vx,o.vy),gdx=foe.x-o.x;
+  if(sp>300&&Math.sign(o.vx)===Math.sign(gdx)){const tt=Math.abs(gdx/o.vx),y=o.y+o.vy*tt;if(tt<1.2&&Math.abs(y-H/2)<MOUTH/2)v+=220*(1.2-tt)}
+  return v;
+}
+function lookSteer(g,r,P){
+  const o=g.orb;if(g.phase!=='play'||r.stun>0||Math.hypot(o.x-r.x,o.y-r.y)>520)return;
+  const ai=r.ai,base=Math.atan2(ai.ty-r.y,ai.tx-r.x),T=P.look||.6;
+  let best=null,bv=-1e9;
+  const save=[r.ix,r.iy],canD=r.ch>=1&&r.cd<=0;
+  for(const da of P.angles||[0,-.6,.6,-1.2,1.2]){
+    const a=base+da;r.ix=Math.cos(a);r.iy=Math.sin(a);
+    for(const d of(canD&&Math.abs(da)<=(P.dashSpread==null?(g.size>1?.7:9):P.dashSpread)?[false,true]:[false])){
+      const v=simValue(g,r,d,T,P)-(d?(r.ch>=2?25:70):0)-Math.abs(da)*12;
+      if(v>bv){bv=v;best=[a,d]}
+    }
+  }
+  r.ix=save[0];r.iy=save[1];
+  ai.sa=best[0];ai.saT=P.lookEvery*1.6||.1;ai.dash=best[1];
+}
+function lookDash(g,r,P){
+  if(r.ch<1||r.cd>0||r.stun>0||g.phase!=='play')return null;
+  const o=g.orb;let near=Math.hypot(o.x-r.x,o.y-r.y)<420||r.carry;
+  if(!near)for(const q of g.rings)if(q.team!==r.team&&Math.hypot(q.x-r.x,q.y-r.y)<300){near=true;break}
+  if(!near)return null;
+  const T=P.look||.7,a=simValue(g,r,true,T,P),b=simValue(g,r,false,T,P);
+  return a>b+(r.ch>=2?25:70);
+}
+// distance from point (px,py) to segment (ax,ay)-(bx,by)
+function segDist(px,py,ax,ay,bx,by){const vx=bx-ax,vy=by-ay,l=vx*vx+vy*vy||1,t=clamp(((px-ax)*vx+(py-ay)*vy)/l,0,1);return Math.hypot(px-ax-vx*t,py-ay-vy*t)}
+// how open a shot from (x,y) to the goal line at height gy is: distance of the nearest defender to that lane
+function laneOpen(g,team,x,y,gx,gy){let m=1e9;for(const q of g.rings){if(q.team===team||q.stun>0)continue;m=Math.min(m,segDist(q.x+q.vx*.15,q.y+q.vy*.15,x,y,gx,gy))}return m}
+function bestAim(g,r,foe){
+  let best=H/2,bv=-1;
+  for(let k=-2;k<=2;k++){const y=H/2+k*(MOUTH/2-OR-10)/2,v=laneOpen(g,r.team,g.orb.x,g.orb.y,foe.x,y)-Math.abs(k)*6;if(v>bv){bv=v;best=y}}
+  return best;
 }
 function botDecide(g,r,P){
   const ai=r.ai,o=g.orb,own=goalOf(r.team),foe=goalOf(1-r.team);
   const car=g.carrier>=0?g.rings[g.carrier]:null;
   ai.face=null;ai.urgent=false;
+  const smart=Math.random()<P.iq;
   const nz=()=>(Math.random()-.5)*2*P.noise;
   let tx,ty;
   const angTo=(x,y)=>Math.atan2(y-r.y,x-r.x);
   if(g.phase==='cd'){ai.tx=r.x;ai.ty=r.y;ai.face=angTo(o.x,o.y);return}
+  // save: a shot is flying at our goal, get in front of it
+  if(smart&&P.fs!==0&&car!==r&&!(car&&car.team===r.team)){
+    const sp=Math.hypot(o.vx,o.vy),gdx=own.x-o.x;
+    if(sp>420&&o.vx!==0&&Math.sign(o.vx)===Math.sign(gdx)&&Math.abs(gdx)<W*.62){
+      const tt=Math.abs(gdx/o.vx),yAt=o.y+o.vy*tt;
+      if(tt<1.5&&Math.abs(yAt-H/2)<MOUTH/2+45){
+        const ix=own.x+(r.team===0?75:-75),it=Math.abs((ix-o.x)/o.vx),iy=clamp(o.y+o.vy*it,RO,H-RO);
+        const myT=Math.hypot(ix-r.x,iy-r.y)/MAXV;
+        ai.tx=ix;ai.ty=iy;ai.urgent=true;ai.face=angTo(o.x,o.y);
+        if(r.ch>=1&&myT>it*.75&&Math.cos(r.f-angTo(ix,iy))>.8)ai.dash=true;
+        return;
+      }
+    }
+  }
   if(car===r){
-    if(ai.aimY==null)ai.aimY=H/2+rnd(-.25,.25)*MOUTH;
+    ai.aimT=(ai.aimT||0)-P.react;
+    if(ai.aimY==null||(smart&&P.fa!==0&&ai.aimT<=0)){ai.aimY=smart&&P.fa!==0?bestAim(g,r,foe):H/2+rnd(-.25,.25)*MOUTH;ai.aimT=.35}
     let dx=foe.x-r.x,dy=ai.aimY-r.y;const d=Math.hypot(dx,dy);dx/=d;dy/=d;
     let sx=0,sy=0,threat=1e9;
     for(const q of g.rings){
@@ -746,7 +896,22 @@ function botDecide(g,r,P){
     }
     tx=r.x+(dx+sx*.9)*200;ty=r.y+(dy+sy*.9)*200;ai.urgent=true;
     const al=Math.cos(r.f-Math.atan2(dy,dx));
-    if(r.ch>=1&&((d<P.shoot&&al>.93)||(threat<120&&al>.55&&d<950))&&Math.random()<P.dash+.2)ai.dash=true;
+    const open=smart&&P.fa!==0?laneOpen(g,r.team,o.x,o.y,foe.x,ai.aimY):1e9;
+    let goodShot=d<P.shoot&&al>.93&&(open>RO+OR-4||d<230);
+    let panic=threat<120&&al>.55&&d<950;
+    if(smart&&P.fp===1){
+      // someone is lining up a dash at us: shoot now if it is decent, otherwise slip sideways
+      for(const q of g.rings){
+        if(q.team===r.team||q.stun>0||q.ch<1)continue;
+        const qd=Math.hypot(r.x-q.x,r.y-q.y);
+        if(qd<220&&Math.cos(q.f-Math.atan2(r.y-q.y,r.x-q.x))>.82){
+          if(d<P.shoot*1.3&&al>.8)panic=true;
+          else{const ux=(r.x-q.x)/qd,uy=(r.y-q.y)/qd,side=(dx*uy-dy*ux)>0?1:-1;tx=r.x+(dx*.5-uy*side)*200;ty=r.y+(dy*.5+ux*side)*200}
+          break;
+        }
+      }
+    }
+    if(r.ch>=1&&(goodShot||panic)&&Math.random()<P.dash+.2)ai.dash=true;
   }else{
     ai.aimY=null;
     if(car&&car.team===r.team){
@@ -755,14 +920,31 @@ function botDecide(g,r,P){
     }else if(car){
       const d=Math.hypot(car.x-r.x,car.y-r.y);
       if(r.role==='att'||d<260||g.size===1){
-        tx=car.x+car.vx*.25;ty=car.y+car.vy*.25;ai.urgent=true;
-        if(d<190&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.85&&Math.random()<P.dash)ai.dash=true;
+        if(smart&&P.fd!==0){
+          // stay between the carrier and our goal, then strike when lined up
+          const gx=own.x-car.x,gy=own.y-car.y,gl=Math.hypot(gx,gy)||1;
+          const goalSide=((r.x-car.x)*gx+(r.y-car.y)*gy)/gl>20;
+          if(!goalSide&&d>110){const k=Math.min(gl*.5,170);tx=car.x+gx/gl*k;ty=car.y+gy/gl*k}
+          else if(P.fg===1&&gl<W*.5&&d>150){tx=own.x+(car.x-own.x)*.35;ty=own.y+(car.y-own.y)*.35;ai.face=angTo(car.x,car.y)}
+          else{tx=car.x+car.vx*.18;ty=car.y+car.vy*.18}
+          if(d<175&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.88&&Math.random()<P.dash)ai.dash=true;
+        }else{
+          tx=car.x+car.vx*.25;ty=car.y+car.vy*.25;
+          if(d<190&&r.ch>=1&&Math.cos(r.f-angTo(car.x,car.y))>.85&&Math.random()<P.dash)ai.dash=true;
+        }
+        ai.urgent=true;
       }else{tx=own.x+(car.x-own.x)*.3;ty=own.y+(car.y-own.y)*.3;ai.face=angTo(car.x,car.y)}
     }else{
       const oDist=Math.hypot(o.x-own.x,o.y-own.y);
-      const go=r.role==='att'||g.size===1||(r.role==='def'&&oDist<330);
+      let go=r.role==='att'||g.size===1||(r.role==='def'&&oDist<330);
+      const dd0=Math.hypot(o.x-r.x,o.y-r.y);
+      if(go&&smart&&P.fr!==0&&dd0>200&&oDist<W*.55){
+        // losing the race to the orb near our goal: drop back goal-side instead of chasing
+        let od=1e9;for(const q of g.rings)if(q.team!==r.team&&q.stun<=0)od=Math.min(od,Math.hypot(o.x-q.x,o.y-q.y));
+        if(od<dd0*.6){go=false;tx=own.x+(o.x-own.x)*.3;ty=own.y+(o.y-own.y)*.3;ai.face=angTo(o.x,o.y);ai.urgent=true}
+      }
       if(go){
-        const dd0=Math.hypot(o.x-r.x,o.y-r.y),t=clamp(dd0/700,0,.6);
+        const t=clamp(dd0/700,0,.6);
         const px=clamp(o.x+o.vx*t,OR,W-OR),py=clamp(o.y+o.vy*t,OR,H-OR);
         let ax=foe.x-px,ay=foe.y-py;const al=Math.hypot(ax,ay);ax/=al;ay/=al;
         const toX=px-r.x,toY=py-r.y,dd=Math.hypot(toX,toY)||1;
@@ -771,16 +953,18 @@ function botDecide(g,r,P){
         if(along>.35||dd<70){
           tx=px+ax*25;ty=py+ay*25;
           const nearGoal=Math.hypot(foe.x-px,foe.y-py)<P.shoot+150;
-          if(r.ch>=1&&dd<130&&nearGoal&&Math.cos(r.f-Math.atan2(toY,toX))>.9&&Math.random()<P.dash*.5)ai.dash=true;
+          const keep=smart&&P.fk!==0&&r.ch<2&&!nearGoal;
+          if(smart&&P.fko===1&&r.ch>=1&&Math.hypot(o.vx,o.vy)<30&&Math.abs(o.x-W/2)<6&&Math.abs(o.y-H/2)<6&&dd>150&&dd<330&&Math.cos(r.f-Math.atan2(toY,toX))>.95)ai.dash=true;
+          if(!keep&&r.ch>=1&&dd<130&&nearGoal&&Math.cos(r.f-Math.atan2(toY,toX))>.9&&Math.random()<P.dash*.5)ai.dash=true;
           if(r.ch>=2&&dd>260&&dd<520&&along>.8&&Math.random()<P.dash*.15)ai.dash=true;
         }else{
           const s=((r.x-px)*-ay+(r.y-py)*ax)>=0?1:-1;
           tx=px-ax*120+-ay*s*95;ty=py-ay*120+ax*s*95;
         }
-      }else if(r.role==='def'){
+      }else if(tx==null&&r.role==='def'){
         tx=own.x+(o.x-own.x)*.28;ty=own.y+(o.y-own.y)*.28;ai.face=angTo(o.x,o.y);
         if(r.team===0)tx=Math.max(tx,90);else tx=Math.min(tx,W-90);
-      }else{
+      }else if(tx==null){
         tx=o.x+(own.x-o.x)*.38;ty=H/2+(o.y<H/2?210:-210);ai.face=angTo(o.x,o.y);
       }
     }
@@ -838,6 +1022,7 @@ ui.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.go){if(b.dataset.go==='online')openOnline();else show(b.dataset.go);return}
   const a=b.dataset.act;if(!a)return;
+  if(typeof rkAction==='function'&&rkAction(a))return;
   if(a==='local')startLocal();
   else if(a==='free')startFree();
   else if(a==='resume')resume();
@@ -883,7 +1068,7 @@ function botSlots(n,diff,skip){
   for(const t of[0,1])for(let i=0;i<n;i++){if(skip&&t===0&&i===0){s.push(skip);continue}s.push({team:t,name:names[k++%names.length],bot:true,diff})}
   return s;
 }
-function startAttract(){app.mode='attract';app.paused=false;app.mySlot=-1;app.game=new Game({mode:'match',size:3,duration:9999,slots:botSlots(3,'elite'),attract:true});clearScuff()}
+function startAttract(){app.mode='attract';app.paused=false;app.mySlot=-1;app.game=new Game({mode:'match',size:3,duration:9999,slots:botSlots(3,'pro'),attract:true});clearScuff()}
 function startLocal(){
   const n=settings.size;
   app.game=new Game({mode:'match',size:n,duration:settings.len,slots:botSlots(n,settings.diff,{team:0,name:myName(),local:true})});
@@ -1313,6 +1498,7 @@ function showEnd(){
   $('againBtn').hidden=online&&!host;$('lobbyBtn').hidden=!(online&&host);$('againBtn').firstChild.textContent=online?'Rematch':'Play again';
   $('endQuit').firstChild.textContent=online?'Leave match':'Menu';
   $('endNote').hidden=!(online&&!host);$('endNote').textContent='Waiting for the host to start a rematch.';
+  if(typeof rkOnEnd==='function')rkOnEnd();
   show('end');
 }
 
@@ -1506,7 +1692,8 @@ function clientFrame(dt){
   const M=Net.match;
   if(!M.hostPeer){const hp=M.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.h===1);if(hp)M.hostPeer=hp.peer}
   const host=M.hostPeer?M.room.peers().find(p=>p.peer===M.hostPeer):null;
-  if(!host){M.missing+=dt;if((M.seenHost&&M.missing>4)||(!M.seenHost&&M.missing>9)){leaveMatch(M.seenHost?'The host left the match.':'No match found for code '+M.code.toUpperCase()+'. Check the code and try again.');return}}
+  if(!host&&M.rk&&typeof rkHostGone==='function'){M.missing+=dt;if(rkHostGone(M))return}
+  else if(!host){M.missing+=dt;if((M.seenHost&&M.missing>4)||(!M.seenHost&&M.missing>9)){leaveMatch(M.seenHost?'The host left the match.':'No match found for code '+M.code.toUpperCase()+'. Check the code and try again.');return}}
   else{
     M.seenHost=true;M.missing=0;
     if(host.presence!==M.lastPres){
@@ -1683,9 +1870,10 @@ function renderMatchLobby(){
     const myT=L2&&Array.isArray(L2.sl)?(L2.sl.find(s=>Array.isArray(s)&&s[1]===me)||[null])[0]:null;
     $('mlNote').textContent=!L2?'Connecting to the host…':myT===-1?'This match is full. You will watch until a spot opens.':'Waiting for the host to start.';
   }
+  if(typeof rkLobby==='function')rkLobby(M,L2);
 }
 const GAME_LABEL='2D';
-const BOTLABEL={rookie:'Rookie',pro:'Pro',elite:'Elite'};
+const BOTLABEL={rookie:"Rookie",pro:"Pro",elite:"Elite",legend:"Legend"};
 function hostBackToLobby(){
   const M=Net.match;if(!M||M.role!=='host')return;
   M.live=false;M.game=null;startAttract();hostSync();show('mlobby');renderMatchLobby();
@@ -1761,8 +1949,196 @@ function leaveMatch(msg){
   const M=Net.match;if(!M)return;
   try{M.room.leave().catch(()=>{})}catch{}
   Net.match=null;app.paused=false;startAttract();lobbyPresence();
+  if(M.rk&&typeof rkLeft==='function'){rkLeft(msg);return}
   show('online');renderOnline();if(msg)toast(msg);
 }
+
+/* ================= ranked (website only) ================= */
+// The server hosts every ranked match, so results can't be faked. This file is added to the game
+// pages when the website is built; the game itself only calls these hooks when they exist.
+const RKS=window.LoopRanks;
+const RK={st:'idle',game:GAME_LABEL.toLowerCase(),md:clamp(num(store.get('rkmd',1),1)|0,1,3),prof:null,res:null,q:null,timer:0};
+function rkKey(md){return RK.game+md}
+function rkMode(md){const m=RK.prof&&RK.prof.m&&RK.prof.m[rkKey(md)];return m||{mmr:RKS.START,pl:0,w:0,l:0}}
+function rkRank(m){return RKS.rankOf(m.mmr,m.pl>=RKS.PLACEMENTS)}
+async function rkLoad(){
+  const me=RKS.identity(true);if(!me)return;
+  try{
+    const r=await fetch('/api/me',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pid:me.id,key:me.key})});
+    const j=await r.json();
+    if(j&&j.m)RK.prof=j;else if(j&&j.fresh)RK.prof={m:{}};else if(j&&j.error)RK.prof={m:{},bad:true};
+  }catch{}
+  rkRender();
+}
+function rkOpen(){
+  show('ranked');netInit();
+  const n=$('rkName');if(!n.value)n.value=store.get('name','')||($('nameIn')&&$('nameIn').value)||'';
+  rkRender();rkLoad();
+}
+function rkRender(){
+  if(!$('rkModes'))return;
+  const box=$('rkModes');box.textContent='';
+  for(const md of[1,2,3]){
+    const m=rkMode(md),rk=rkRank(m),b=document.createElement('button');
+    b.className='rkmode';b.setAttribute('aria-pressed',String(md===RK.md));b.dataset.md=md;b.disabled=RK.st!=='idle';
+    const t=document.createElement('span');t.className='t';t.textContent=md+'v'+md;
+    const ic=document.createElement('span');ic.innerHTML=RKS.icon(rk,44);
+    const n=document.createElement('span');n.className='n';n.textContent=rk.unranked?'Unranked':rk.name;n.style.color=rk.unranked?'':rk.color;
+    const r=document.createElement('span');r.className='r';r.textContent=rk.unranked?`Placement ${m.pl}/${RKS.PLACEMENTS}`:m.mmr.toLocaleString()+' rating';
+    b.append(t,ic,n,r);box.append(b);
+  }
+  const q=RK.st==='queue'||RK.st==='found';
+  $('rkQ').hidden=!q;$('rkCancel').hidden=RK.st!=='queue';$('rkGo').hidden=q;
+  $('rkGoK').textContent='Ranked '+RK.md+'v'+RK.md;
+  const note=$('rkNote');
+  if(RK.prof&&RK.prof.bad){note.hidden=false;note.textContent='This device has an old ranked key. Restore your ranks from the Star Chart on the main page, or clear this site’s data to start fresh.'}
+  else if(!RKS.identity(false)&&RK.prof===null){note.hidden=false;note.textContent='Ranked needs this browser to remember a small key. Private windows may block it.'}
+  else note.hidden=true;
+  rkQueueText();
+}
+function rkQueueText(){
+  if(!RK.q)return;
+  const s=Math.max(0,Math.floor((Date.now()-RK.q.t0)/1000));
+  $('rkQTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  if(RK.st==='found'){$('rkQText').textContent='Match found';$('rkQSub').textContent='Loading in…';return}
+  $('rkQText').textContent='Searching';
+  const others=Math.max(0,(RK.q.n||1)-1),left=Math.max(0,(RK.q.bots||7)-s);
+  $('rkQSub').textContent=(others?`${others} other ${others===1?'player':'players'} searching ${RK.md}v${RK.md}. `:`Nobody else is searching ${RK.md}v${RK.md} right now. `)+(left>0?`Bots at your rank fill in after ${left}s.`:'Setting up bots at your rank…');
+}
+function rkSend(){
+  const me=RKS.identity(true);
+  if(!me){toast('Ranked needs this browser to keep a small key. Private windows may block it.');return false}
+  const nm=cleanName($('rkName').value||myName());
+  return window.LOOPBALL.send({t:'rq',g:RK.game,md:RK.md,pid:me.id,key:me.key,nm});
+}
+function rkQueue(md){
+  if(md)RK.md=md;store.set('rkmd',RK.md);
+  if(Net.match)return;
+  if(RK.st==='queue')return;
+  RK.st='queue';RK.q={t0:Date.now(),n:1,bots:7};RK.res=null;
+  if(curScreen!=='ranked'){show('ranked');rkLoad()}
+  rkRender();
+  netInit();
+  const tryNow=()=>{if(RK.st!=='queue')return;if(!(window.LOOPBALL.isConnected&&window.LOOPBALL.isConnected())||!rkSend())setTimeout(tryNow,400)};
+  tryNow();
+  clearInterval(RK.timer);RK.timer=setInterval(()=>{if(RK.st==='idle'){clearInterval(RK.timer);return}if(curScreen==='ranked')rkQueueText()},500);
+}
+function rkCancel(){
+  if(RK.st!=='queue')return;
+  window.LOOPBALL.send({t:'rx'});RK.st='idle';RK.q=null;rkRender();
+}
+async function rkJoin(m){
+  if(Net.match&&Net.match.rk&&Net.match.code===m.code)return;
+  if(Net.match)return;
+  RK.st='found';RK.res=null;rkRender();Sfx.go();
+  const wait=()=>new Promise(res=>{const t0=Date.now(),iv=setInterval(()=>{if(Net.room||Date.now()-t0>8000){clearInterval(iv);res()}},100)});
+  if(!Net.room)await wait();
+  await joinMatch(m.code,m.host,m.md);
+  const M=Net.match;if(!M)return;
+  M.rk=1;M.rkMd=m.md;M.hostPeer=m.host;RK.st='match';
+  renderMatchLobby();
+}
+window.LOOPBALL.onMsg=m=>{
+  if(m.t==='rq'){
+    if(m.st==='denied'){RK.st='idle';RK.q=null;rkRender();const n=$('rkNote');n.hidden=false;n.textContent=m.why||'Ranked is not available right now.';return}
+    if(RK.st!=='queue')return;
+    if(typeof m.n==='number')RK.q.n=m.n;if(typeof m.bots==='number')RK.q.bots=m.bots;
+    if(curScreen==='ranked')rkQueueText();
+  }else if(m.t==='rgo'&&typeof m.code==='string'&&/^[a-z]{5}$/.test(m.code)&&m.g===RK.game){
+    rkJoin(m);
+  }else if(m.t==='rres'){
+    RK.res=m;
+    if(RK.prof){const k=m.g+m.md,cur=RK.prof.m[k]||{};RK.prof.m[k]=Object.assign(cur,{mmr:m.mmr,pl:m.pl,peak:m.peak})}
+    if(curScreen==='end')rkOnEnd();
+    rkLoad();
+  }
+};
+window.LOOPBALL.onConn=c=>{if(c&&RK.st==='queue')rkSend()};
+$('rkModes').addEventListener('click',e=>{const b=e.target.closest('.rkmode');if(!b||RK.st!=='idle')return;RK.md=+b.dataset.md;store.set('rkmd',RK.md);rkRender()});
+$('rkGo').addEventListener('click',()=>{Sfx.init();FS.auto();rkQueue()});
+$('rkCancel').addEventListener('click',rkCancel);
+$('rkName').addEventListener('input',()=>{const v=$('rkName').value;store.set('name',v.trim());const o=$('nameIn');if(o)o.value=v});
+ui.addEventListener('click',e=>{const b=e.target.closest('[data-go="ranked"]');if(b){e.stopImmediatePropagation();Sfx.init();rkOpen()}},true);
+
+// hooks the game calls
+function rkHostGone(M){
+  if(RK.res||(M.game&&M.game.phase==='end'))return true;   // the match is over; the server closes the room later
+  if((M.seenHost&&M.missing>8)||(!M.seenHost&&M.missing>16)){leaveMatch(M.seenHost?'Lost contact with the ranked match.':'Could not load the ranked match. Try again.');return true}
+  return true;
+}
+function rkLobby(M,L2){
+  const box=document.querySelector('#s-mlobby .codebox');
+  if(box)box.hidden=!!M.rk;$('mlPub').hidden=!!M.rk;$('mlSwitch').hidden=!!M.rk;
+  if(!M.rk)return;
+  $('mlTitle').textContent=`Ranked ${M.rkMd}v${M.rkMd}`;
+  $('mlNote').textContent=L2?'Match found. Waiting for everyone to load in…':'Connecting to the match…';
+  if(!L2||!Array.isArray(L2.sl))return;
+  const me=myPeerIn(M.room);
+  for(const t of[0,1]){
+    const ol=$('tl'+t);ol.textContent='';
+    L2.sl.forEach((s,i)=>{
+      if(!Array.isArray(s)||s[0]!==t)return;
+      const li=document.createElement('li'),b=document.createElement('span');b.className='rkbadge';
+      const st=Array.isArray(L2.rs)?num(L2.rs[i],-1):-1;
+      b.innerHTML=st>=0?RKS.icon(RKS.fromStep(st),26):'';
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=cleanName(s[2]);
+      li.append(b,nm);
+      if(s[1]===me){const y=document.createElement('span');y.className='you';y.textContent='YOU';li.append(y)}
+      ol.append(li);
+    });
+  }
+}
+function rkOnEnd(){
+  const box=$('rkRes');if(!box)return;
+  const M=Net.match;
+  if(!(M&&M.rk)){box.hidden=true;return}
+  $('againBtn').hidden=false;$('againBtn').firstChild.textContent='Queue again';
+  $('lobbyBtn').hidden=true;$('endNote').hidden=true;$('endQuit').firstChild.textContent='Ranked menu';
+  box.hidden=false;box.textContent='';
+  const r=RK.res;
+  const wrap=document.createElement('div');wrap.className='rkres';
+  if(!r){const s=document.createElement('div');s.className='sub';s.textContent='Updating your rank…';wrap.append(s);box.append(wrap);return}
+  const placed=!!r.placed,rk=RKS.rankOf(r.mmr,placed),before=r.wp?RKS.rankOf(r.prev):null;
+  const ic=document.createElement('div');ic.innerHTML=RKS.icon(rk,72);
+  const info=document.createElement('div');info.className='info';
+  const nm=document.createElement('div');nm.className='nm';
+  const b=document.createElement('b');b.textContent=rk.unranked?'Unranked':rk.name;if(!rk.unranked)b.style.color=rk.color;
+  const d=document.createElement('span');d.className='d '+(r.d>=0?'up':'down');d.textContent=(r.d>=0?'+':'−')+Math.abs(r.d);
+  nm.append(b,d);
+  const bar=document.createElement('div');bar.className='bar';const fill=document.createElement('i');fill.style.background=rk.unranked?'var(--chalk)':rk.color;
+  const prog=rk.unranked?r.pl/RKS.PLACEMENTS:rk.progress;fill.style.width='0%';bar.append(fill);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{fill.style.width=Math.round(prog*100)+'%'}));
+  const sub=document.createElement('div');sub.className='sub';
+  if(rk.unranked)sub.textContent=`Placement match ${r.pl} of ${RKS.PLACEMENTS}. Your rank shows after ${RKS.PLACEMENTS}.`;
+  else if(rk.next)sub.textContent=`${r.mmr.toLocaleString()} rating · ${rk.next-r.mmr} to ${rk.nextName}`;
+  else sub.textContent=`${r.mmr.toLocaleString()} rating · the top of the sky`;
+  info.append(nm,bar,sub);
+  let msg='';
+  if(placed&&!r.wp)msg=`Placed in ${rk.name}!`;
+  else if(before&&rk.step>before.step)msg=rk.t>before.t?`Promoted to ${rk.tier}!`:`Up to ${rk.name}!`;
+  else if(before&&rk.step<before.step)msg=`Down to ${rk.name}`;
+  else if(r.mvp)msg='MVP of the match';
+  else if(r.st>=3)msg=`${r.st} wins in a row`;
+  if(msg){const m=document.createElement('div');m.className='sub msg';m.textContent=msg;info.append(m)}
+  wrap.append(ic,info);box.append(wrap);
+}
+function rkAction(a){
+  const M=Net.match;if(!(M&&M.rk))return false;
+  if(a==='again'){const md=M.rkMd;leaveMatch();rkQueue(md);return true}
+  if(a==='quit'){
+    const live=M.game&&M.game.phase!=='end'&&!RK.res,b=$('quitBtn');
+    if(live&&curScreen==='pause'&&!(RK.quitArm>Date.now())){RK.quitArm=Date.now()+4000;b.firstChild.textContent='Tap again: leaving counts as a loss';setTimeout(()=>{if(!(RK.quitArm>Date.now()))b.firstChild.textContent='Leave match'},4100);return true}
+    RK.quitArm=0;leaveMatch();return true;
+  }
+  if(a==='lobby')return true;
+  return false;
+}
+function rkLeft(msg){
+  RK.st='idle';RK.q=null;
+  show('ranked');rkRender();rkLoad();if(msg)toast(msg);
+}
+// the main page links straight here with ?go=ranked
+try{if(new URLSearchParams(location.search).get('go')==='ranked')setTimeout(rkOpen,0)}catch{}
 
 /* ================= main loop ================= */
 let lastT=performance.now();

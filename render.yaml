@@ -8,3 +8,6 @@ services:
     startCommand: node server.js
     healthCheckPath: /healthz
     autoDeploy: true
+    envVars:
+      - key: DATABASE_URL   # Neon connection string; keeps ranks safe across restarts (see README)
+        sync: false
