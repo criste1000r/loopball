@@ -141,6 +141,16 @@ kbd{font-family:var(--body);font-size:12px;font-weight:700;border:1px solid var(
 #dashBtn{position:fixed;z-index:3;pointer-events:none;width:112px;height:112px;border-radius:50%;right:calc(max(16px,var(--sa-right,env(safe-area-inset-right,0px))) + 16px);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 30px);background:rgba(58,98,255,.38);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-family:var(--display);font-weight:900;font-size:25px;letter-spacing:.05em;transition:transform .08s,opacity .15s}
 #dashBtn.t1{background:rgba(255,117,54,.42)}
 #dashBtn.press{scale:.9}
+#replayUI{position:fixed;z-index:3;left:50%;transform:translateX(-50%);top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 66px);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.rp-chip{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:900;font-size:24px;letter-spacing:.14em;text-transform:uppercase;background:rgba(14,26,43,.85);border:1px solid var(--line);padding:6px 16px;border-radius:999px}
+.rp-chip i{width:11px;height:11px;border-radius:50%;background:#ff3b3b;animation:rpdot 1s ease-in-out infinite}
+@keyframes rpdot{50%{opacity:.25}}
+.rp-who{font-weight:700;font-size:15px;background:rgba(14,26,43,.7);padding:5px 12px;border-radius:8px;font-variant-numeric:tabular-nums}
+#skipBtn{position:fixed;z-index:4;left:50%;transform:translateX(-50%);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 7% + 14px);font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.06em;text-transform:uppercase;padding:11px 22px;border-radius:12px;border:2px solid var(--chalk);background:rgba(14,26,43,.8);color:var(--chalk);cursor:pointer;white-space:nowrap}
+#skipBtn:disabled{opacity:.6;cursor:default}
+#skipBtn:focus-visible{outline:3px solid var(--chalk);outline-offset:2px}
+body.replaying #stick,body.replaying #dashBtn,body.replaying #dashMeter,body.replaying #resetBtn{visibility:hidden}
+@media (prefers-reduced-motion:reduce){.rp-chip i{animation:none}}
 #dashBtn.empty{opacity:.55}
 #dashBtn .prog{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);transform:rotate(-90deg)}
 #dashBtn .prog circle{fill:none;stroke-width:6}
@@ -235,6 +245,8 @@ a.back{text-decoration:none;display:inline-block}
 <button id="pauseBtn" hidden aria-label="Pause">II</button>
 <button id="fsBtn" hidden aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
 <button id="resetBtn" hidden>Reset orb</button>
+<div id="replayUI" hidden><div class="rp-chip"><i></i>Replay</div><div class="rp-who" id="rpWho"></div></div>
+<button id="skipBtn" hidden>Skip replay</button>
 <div id="ping" hidden></div>
 
 <div id="ui">
@@ -537,7 +549,8 @@ window.LOOPBALL = { standalone: true };
 const W=1400,H=800,CR=140,MOUTH=230,GD=70,POST=7;
 const RR=33,RT=11,RO=RR+RT/2,RI=RR-RT/2,OR=14,GAP=0.68;
 const MAXV=380,ACC=2300,DASHV=880,DASHT=0.2,MAXCH=2,CHARGE=1.4,TURN=12.5,ORB_MAX=1650;
-const STEP=1/240,CD_T=2.4,GOAL_T=2.6,KMH=0.11;
+const STEP=1/240,CD_T=2.4,GOAL_T=2.6,KMH=0.11,REC_DT=1/30,REC_KEEP=9;
+const REC_EV=new Set(['hit','bump','dash','wall','clack','post']);   // sounds the replay plays back
 const CREASE=190; // goal-zone radius
 const COL=['#3a62ff','#ff7536'],COL_SOFT=['#a9bbff','#ffc3a6'],TNAME=['Blue','Orange'];
 const BOTNAMES=['Vela','Kip','Moro','Tuck','Rhee','Sable','Quill','Juno','Pike','Wren','Ozzy','Lark'];
@@ -572,6 +585,7 @@ class Game{
     this.phase=this.free?'play':'cd';this.phaseT=this.free?0:CD_T;
     this.goalId=0;this.lastGoal=null;this.acc=0;this.events=[];this.roleT=0;
     this.fp={last:0,best:0,goals:0};
+    this.simT=0;this.recT=0;this.rec={frames:[],touches:[],sounds:[]};this.rp=null;this.skips=new Set();this.goalT=0;this.replays=!this.free&&!this.attract;
     this.kickoff();
   }
   kickoff(){
@@ -584,6 +598,25 @@ class Game{
       r.ghost.length=0;r.ai={t:0};
     }
     const o=this.orb;Object.assign(o,{x:W/2,y:H/2,vx:0,vy:0,last:-1});o.trail.length=0;
+    if(this.rec){this.rec.frames.length=0;this.rec.touches.length=0;this.rec.sounds.length=0}
+  }
+  record(){
+    const o=this.orb,F=this.rec.frames;
+    F.push({t:this.simT,o:[o.x,o.y,o.vx,o.vy],l:o.last,r:this.rings.map(r=>[r.x,r.y,r.f,r.stun>0?1:0,r.ch,r.chT,r.dashT>0?1:0])});
+    while(F.length&&F[0].t<this.simT-REC_KEEP)F.shift();
+    const T=this.rec.touches;while(T.length&&T[0].t<this.simT-REC_KEEP)T.shift();
+    const S=this.rec.sounds;while(S.length&&S[0].t<this.simT-REC_KEEP)S.shift();
+  }
+  startReplay(){
+    if(!this.replays)return false;
+    const plan=buildReplayPlan(this);if(!plan)return false;
+    this.rp=plan;this.phase='replay';this.phaseT=plan.dur+.4;this.skips=new Set();
+    this.events.push({type:'replay'});return true;
+  }
+  afterReplay(){
+    this.rp=null;
+    if(this.time<=0&&!this.attract&&!this.ot&&this.score[0]===this.score[1]){this.ot=true;this.events.push({type:'ot'})}
+    this.kickoff();this.phase='cd';this.phaseT=CD_T;this.events.push({type:'replayEnd'});
   }
   respawnOrb(nearMe){
     const o=this.orb;const r=this.rings[0];
@@ -592,10 +625,22 @@ class Game{
     o.vx=o.vy=0;o.last=-1;o.trail.length=0;
   }
   tick(dt){
+    if(this.phase==='replay'){
+      if(this.rp)this.rp.t=Math.min(this.rp.end,this.rp.t+dt*replaySpeed(this.rp.t,this.rp));
+      if(this.authority)this.phaseLogic(dt);else this.phaseT=Math.max(0,this.phaseT-dt);
+      return;
+    }
     let scale=1;
     if(this.phase==='goal'&&GOAL_T-this.phaseT<0.8)scale=0.3;
     this.acc+=dt*scale;let n=0;
-    while(this.acc>=STEP&&n<20){this.step(STEP);this.acc-=STEP;n++}
+    while(this.acc>=STEP&&n<20){
+      const e0=this.events.length;
+      this.step(STEP);this.acc-=STEP;n++;this.simT+=STEP;
+      if(this.phase==='play'||this.phase==='goal'){
+        for(let i=e0;i<this.events.length;i++){const e=this.events[i];if(REC_EV.has(e.type))this.rec.sounds.push(Object.assign({t:this.simT},e))}
+        if(this.simT-this.recT>=REC_DT){this.recT=this.simT;this.record()}
+      }
+    }
     if(n>=20)this.acc=0;
     if(this.authority)this.phaseLogic(dt);else this.phaseT=Math.max(0,this.phaseT-dt);
   }
@@ -615,12 +660,14 @@ class Game{
       if(this.free&&this.phaseT<=GOAL_T-1.4){this.respawnOrb(false);this.phase='play';this.phaseT=0;return}
       if(this.phaseT<=0){
         if(this.ot&&!this.attract)this.endMatch();
-        else if(this.time<=0&&!this.attract){
-          if(this.score[0]===this.score[1]){this.ot=true;this.events.push({type:'ot'});this.kickoff();this.phase='cd';this.phaseT=CD_T}
-          else this.endMatch();
-        }
-        else{this.kickoff();this.phase='cd';this.phaseT=CD_T}
+        else if(this.time<=0&&!this.attract&&this.score[0]!==this.score[1])this.endMatch();
+        else if(!this.startReplay())this.afterReplay();
       }
+    }else if(this.phase==='replay'){
+      this.phaseT-=dt;
+      // bots never hold up a replay: it ends once every human has skipped
+      const allSkipped=this.rings.every(r=>r.bot||this.skips.has(r.i));
+      if(this.phaseT<=0||allSkipped)this.afterReplay();
     }
   }
   // At 0:00 the match continues while the orb is held in a ring or sits in a colored goal zone.
@@ -635,7 +682,7 @@ class Game{
     const by=o.last;const own=by>=0&&this.rings[by]&&this.rings[by].team!==team;
     if(this.free){if(team===0)this.fp.goals++}
     else{this.score[team]++;if(by>=0&&!own)this.rings[by].goals++}
-    this.goalId++;this.lastGoal={id:this.goalId,team,by,spd,own};this.lastPlay=false;
+    this.goalId++;this.lastGoal={id:this.goalId,team,by,spd,own};this.lastPlay=false;this.goalT=this.simT;
     this.phase='goal';this.phaseT=GOAL_T;
     this.events.push(Object.assign({type:'goal'},this.lastGoal));
   }
@@ -734,6 +781,7 @@ class Game{
     const e=inner?(r.dashT>0?.9:.18):.6;
     o.vx-=(1+e)*vn*nx;o.vy-=(1+e)*vn*ny;
     o.last=r.i;
+    if(-vn>60&&this.rec){const T=this.rec.touches,lt=T[T.length-1];if(!lt||lt.i!==r.i||this.simT-lt.t>.12)T.push({t:this.simT,i:r.i});else lt.t=this.simT}
     if(-vn>220){
       const sp=Math.hypot(o.vx,o.vy);
       this.events.push({type:'hit',x:o.x,y:o.y,s:-vn,i:r.i,sp});
@@ -773,6 +821,7 @@ class Game{
       r:this.rings.map(r=>[R(r.x),R(r.y),R(r.vx),R(r.vy),F(r.f),F(r.ix),F(r.iy),F(Math.max(0,r.stun)),r.ch,F(Math.max(0,r.dashT)),r.goals]),
       o:[R(o.x),R(o.y),R(o.vx),R(o.vy),o.last],
       g:this.lastGoal?[this.lastGoal.id,this.lastGoal.team,this.lastGoal.by,this.lastGoal.spd,this.lastGoal.own?1:0]:null,
+      sv:this.phase==='replay'?[...this.skips]:null,
       a:ack||null};
   }
 }
@@ -788,6 +837,39 @@ function ringWall(r){
   if(r.x>W-RO){r.x=W-RO;if(r.vx>0)r.vx=-r.vx*e}
   if(r.y<RO){r.y=RO;if(r.vy<0)r.vy=-r.vy*e}
   if(r.y>H-RO){r.y=H-RO;if(r.vy>0)r.vy=-r.vy*e}
+}
+
+/* ================= goal replay ================= */
+// Playback speed in replay-time per real second: slows around the final touch and as the orb crosses the line.
+function replaySpeed(t,rp){
+  const near=(c,w)=>clamp(1-(Math.abs(t-c)-w)/.25,0,1);
+  return 1-.74*Math.max(near(rp.Tt,.3),near(rp.Tg,.32));
+}
+function buildReplayPlan(g){
+  const F=g.rec.frames;if(F.length<12)return null;
+  const Tg=g.goalT,by=g.lastGoal?g.lastGoal.by:-1;
+  let Tt=Tg-.6;
+  for(let k=g.rec.touches.length-1;k>=0;k--){const h=g.rec.touches[k];if(h.t<=Tg+.05&&(by<0||h.i===by)){Tt=h.t;break}}
+  const start=Math.max(F[0].t,Math.min(Tt-1.8,Tg-3.2)),end=Math.min(F[F.length-1].t,Tg+1.0);
+  if(end-start<1)return null;
+  const rp={start,end,t:start,Tt,Tg,by,frames:F.slice(),idx:0,dur:0,sounds:g.rec.sounds.filter(e=>e.t>=start&&e.t<=end),si:0,trail:[],gh:g.rings.map(()=>[])};
+  let t=start;while(t<end&&rp.dur<14){t+=replaySpeed(t,rp)/60;rp.dur+=1/60}
+  return rp;
+}
+function replayView(g){
+  const rp=g.rp,F=rp.frames;
+  while(rp.idx<F.length-2&&F[rp.idx+1].t<=rp.t)rp.idx++;
+  while(rp.idx>0&&F[rp.idx].t>rp.t)rp.idx--;
+  const a=F[rp.idx],b=F[Math.min(rp.idx+1,F.length-1)];
+  const k=b.t>a.t?clamp((rp.t-a.t)/(b.t-a.t),0,1):0,mix=(p,q)=>p+(q-p)*k;
+  const rings=g.rings.map((r,i)=>{
+    const p=a.r[i],q=b.r[i]||p,x=mix(p[0],q[0]),y=mix(p[1],q[1]),f=p[2]+wrap(q[2]-p[2])*k,gh=rp.gh[i];
+    if(rp.lastT!==rp.t){if(p[6]){gh.push([x,y,f]);if(gh.length>6)gh.shift()}else if(gh.length)gh.shift()}
+    return{i,team:r.team,name:r.name,bot:r.bot,x,y,f,stun:p[3]?1:0,ch:p[4]==null?MAXCH:p[4],chT:p[5]||0,ghost:gh};
+  });
+  const orb={x:mix(a.o[0],b.o[0]),y:mix(a.o[1],b.o[1]),vx:mix(a.o[2],b.o[2]),vy:mix(a.o[3],b.o[3]),last:a.l,trail:rp.trail};
+  if(rp.lastT!==rp.t){rp.trail.push([orb.x,orb.y]);if(rp.trail.length>14)rp.trail.shift();rp.lastT=rp.t}
+  return{rings,orb};
 }
 
 /* ================= bots ================= */
@@ -1005,7 +1087,7 @@ function botDecide(g,r,P){
 /* ================= audio ================= */
 const Sfx={c:null,vol:clamp(num(store.get('vol',store.get('sound',true)===false?0:.8),.8),0,1),last:0,
   init(){if(this.c)return;try{this.c=new(window.AudioContext||window.webkitAudioContext)()}catch{this.c=null}},
-  tone(f,d,type,v,slide){const c=this.c;if(!c||!(this.vol>0)||document.hidden)return;v*=this.vol;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(Math.min(.0008,v*.01),t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
+  tone(f,d,type,v,slide){const c=this.c;if(!c||!(this.vol>0)||document.hidden)return;v*=this.vol;try{if(c.state==='suspended')c.resume();const rt=this.rate||1;f*=rt;d/=rt;const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(Math.min(.0008,v*.01),t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
   hit(s){const n=performance.now();if(n-this.last<45)return;this.last=n;this.tone(180+Math.min(s,1400)*.35,.07,'triangle',Math.min(.22,.04+s/5000))},
   wall(s){this.tone(120+Math.min(s,1200)*.08,.06,'sine',Math.min(.12,s/9000))},
   dash(){this.tone(560,.13,'sawtooth',.045,.45)},
@@ -1345,7 +1427,7 @@ function syncHud(){
   touchEl.hidden=!playing;stickEl.hidden=!showTouch;dashEl.hidden=!showTouch||app.mySlot<0;
   $('dashMeter').hidden=!(playing&&!Input.touchUI&&app.mySlot>=0);
   $('fsBtn').hidden=!(playing&&(FS.can||FS.ios)&&!FS.installed);
-  if(!playing){Input.stickT=null;Input.keys.clear()}
+  if(!playing){Input.stickT=null;Input.keys.clear();document.body.classList.remove('replaying');$('replayUI').hidden=true;$('skipBtn').hidden=true}
   if(TE&&TE.on){stickEl.hidden=false;for(const k of ED_KEYS)tbEl(k).hidden=false}
 }
 function myName(){const v=($('nameIn').value||'').trim().slice(0,14);return v||store.get('name','')||'Player'}
@@ -1356,7 +1438,7 @@ async function wake(){try{if(!wakeLock&&navigator.wakeLock)wakeLock=await naviga
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(app.mode==='local'||app.mode==='free')&&ui.hidden)openPause()});
 
 /* ================= input ================= */
-const Input={keys:new Set(),dashQ:false,stickT:null,mouse:{x:0,y:0,has:false},steerH:null,dt:1/60,touchUI:matchMedia('(pointer:coarse)').matches,padPrev:[],navT:0};
+const Input={keys:new Set(),dashQ:false,skipQ:false,stickT:null,mouse:{x:0,y:0,has:false},steerH:null,dt:1/60,touchUI:matchMedia('(pointer:coarse)').matches,padPrev:[],navT:0};
 const DASHKEYS=['Space','ShiftLeft','ShiftRight','KeyJ','KeyK','Enter'];
 window.addEventListener('keydown',e=>{
   Sfx.init();
@@ -1387,6 +1469,7 @@ function menuKey(e){
 }
 touchEl.addEventListener('pointerdown',e=>{
   Sfx.init();
+  if(app.game&&app.game.phase==='replay'){Input.skipQ=true;e.preventDefault();return}
   if(e.pointerType==='mouse'){e.preventDefault();Input.mouse.has=true;Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;if(e.button===0||e.button===2)Input.dashQ=true;return}
   e.preventDefault();
   if(!Input.touchUI){Input.touchUI=true;syncHud();syncOriLabels()}
@@ -1478,12 +1561,19 @@ function pollPad(dt){
   }
   Input.padPrev=p.buttons.map((_,i)=>b(i));
 }
+// returns flags: 1 = dashed, 4 = wants to skip the replay
 function applyLocalInput(r){
-  if(!r)return false;
-  if(!ui.hidden){r.ix=r.iy=0;Input.dashQ=false;return false}
+  if(!r)return 0;
+  if(!ui.hidden){r.ix=r.iy=0;Input.dashQ=Input.skipQ=false;return 0}
+  if(app.game&&app.game.phase==='replay'){
+    r.ix=r.iy=0;
+    if(Input.dashQ||Input.skipQ){Input.dashQ=Input.skipQ=false;return 4}
+    return 0;
+  }
+  Input.skipQ=false;
   const[x,y]=worldStick(r);r.ix=x;r.iy=y;
-  if(Input.dashQ){r.dashReq=true;Input.dashQ=false;return true}
-  return false;
+  if(Input.dashQ){r.dashReq=true;Input.dashQ=false;return 1}
+  return 0;
 }
 
 /* ================= view + fx ================= */
@@ -1500,8 +1590,13 @@ function computeView(cw,ch,dt){
   let ts=full,tx=W/2,ty=H/2;
   const close=Math.max(full,Math.min(cw,avail)/560);
   const mode=settings.cam==='auto'?(full<.62&&close>full*1.18?'follow':'full'):settings.cam;
-  const playing=me&&app.mode!=='attract'&&ui.hidden;
-  if(playing&&mode==='follow'&&g){
+  const playing=me&&app.mode!=='attract'&&ui.hidden,V=view.V;
+  if(V&&g&&g.rp){
+    // replay: frame the shooter and the orb before the shot, then ride with the orb
+    const rp=g.rp,o=V.orb,sh=rp.by>=0?V.rings[rp.by]:null,before=rp.t<rp.Tt;
+    tx=before&&sh?(sh.x+o.x)/2:o.x;ty=before&&sh?(sh.y+o.y)/2:o.y;
+    ts=clamp(Math.min(cw,avail)/620,full,Math.max(full,close*.9));
+  }else if(playing&&mode==='follow'&&g){
     const o=g.orb,c=Math.cos(a),s=Math.sin(a),dx=o.x-me.x,dy=o.y-me.y;
     const sx=Math.abs(dx*c-dy*s),sy=Math.abs(dx*s+dy*c),m=2*RO+170;
     const fit=Math.min(cw/(sx+m),avail/(sy+m));
@@ -1509,7 +1604,7 @@ function computeView(cw,ch,dt){
     tx=me.x*.55+o.x*.45;ty=me.y*.55+o.y*.45;
   }
   view.zoomed=ts>full*1.05;
-  const k=view.snap?1:1-Math.exp(-dt*5);
+  const k=view.snap?1:1-Math.exp(-dt*(V?3:5));
   view.s+=(ts-view.s)*k;
   const hx=(portrait?avail:cw)/view.s/2,hy=(portrait?cw:avail)/view.s/2;
   const x0=-GD-20,x1=W+GD+20,y0=-20,y1=H+20;
@@ -1523,6 +1618,26 @@ const fx={parts:[],shake:0,banner:null,flash:0};
 function burst(x,y,col,n,sp){if(REDUCED)n=Math.ceil(n/3);for(let i=0;i<n&&fx.parts.length<360;i++){const a=Math.random()*6.283,v=rnd(.2,1)*sp;fx.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:rnd(.35,.9),m:.9,c:col,r:rnd(2,5)})}}
 function shake(n){if(!REDUCED)fx.shake=Math.max(fx.shake,n)}
 function haptic(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch{}}
+
+// Replay sound: the hits, bumps and dashes recorded during play are heard again as the replay passes them,
+// pitched down in slow motion; the goal horn plays as the orb crosses the line.
+function replayAudio(g){
+  const rp=g&&g.phase==='replay'?g.rp:null;
+  if(!rp){Sfx.rate=1;return}
+  Sfx.rate=.62+.38*replaySpeed(rp.t,rp);
+  const S=rp.sounds||[];
+  while(rp.si<S.length&&S[rp.si].t<=rp.t){
+    const e=S[rp.si++];if(rp.t-e.t>.3)continue;
+    if(e.type==='hit'){Sfx.hit(e.s);if(e.s>500)burst(e.x,e.y,'#ffffff',Math.min(14,e.s/90|0),e.s*.45)}
+    else if(e.type==='bump'){Sfx.bump();burst(e.x,e.y,COL[e.team],18,450)}
+    else if(e.type==='dash'){Sfx.dash()}
+    else if(e.type==='hop'){Sfx.hop&&Sfx.hop(e.dbl)}
+    else if(e.type==='wall'){Sfx.wall(e.s)}
+    else if(e.type==='clack'){Sfx.hit(e.s*.5)}
+    else if(e.type==='post'){Sfx.tone(1500,.12,'sine',.08);burst(e.x,e.y,'#ffffff',8,260)}
+  }
+  if(!rp.horn&&rp.t>=rp.Tg){rp.horn=true;Sfx.goal();const lg=g.lastGoal;if(lg){const gx=lg.team===0?W+GD/2:-GD/2;burst(gx,H/2,COL[lg.team],60,800);shake(10)}}
+}
 function handleEvents(g){
   for(const e of g.events){
     if(e.type==='goal'){
@@ -1540,6 +1655,8 @@ function handleEvents(g){
     else if(e.type==='ot'){fx.banner={t:0,text:'OVERTIME',sub:'Next goal wins',col:'#f3f6f9'}}
     else if(e.type==='lastplay'){fx.banner={t:0,text:'LAST PLAY',sub:'Ends when the orb is loose on white ice',col:'#f3f6f9'};Sfx.tone(988,.14,'square',.07);setTimeout(()=>Sfx.tone(988,.3,'square',.07),180)}
     else if(e.type==='go'){Sfx.go()}
+    else if(e.type==='replay'){fx.banner=null;fx.flash=.25;fx.parts.length=0;view.snap=true;Sfx.tone(300,.35,'sine',.06,3)}
+    else if(e.type==='replayEnd'){view.snap=true;fx.flash=.2}
     else if(e.type==='end'){if(app.mode!=='attract')setTimeout(showEnd,900)}
   }
   g.events.length=0;
@@ -1613,6 +1730,12 @@ function drawArena(c,g){
   }
 }
 function ringArc(c,x,y,f,r){c.beginPath();c.arc(x,y,r,f+GAP,f-GAP+Math.PI*2)}
+// cinematic bars, and a light dim that fades in with the slow motion
+function replayBars(c,cw,ch,rp){
+  const bh=Math.round(ch*.07);c.fillStyle='rgba(8,14,24,.82)';c.fillRect(0,0,cw,bh);c.fillRect(0,ch-bh,cw,bh);
+  const dim=clamp((1-replaySpeed(rp.t,rp))/.74,0,1)*.12;
+  if(dim>.005){c.fillStyle=`rgba(8,14,24,${dim.toFixed(3)})`;c.fillRect(0,bh,cw,ch-2*bh)}
+}
 function drawRing(c,r,me){
   const col=COL[r.team];
   for(let k=0;k<r.ghost.length;k++){const[gx,gy,gf]=r.ghost[k];c.globalAlpha=.08+k*.035;c.strokeStyle=col;c.lineWidth=RT;c.lineCap='round';ringArc(c,gx,gy,gf,RR);c.stroke()}
@@ -1654,24 +1777,25 @@ function render(dt){
   if(cv.width!==pw||cv.height!==ph){cv.width=pw;cv.height=ph}
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle='#0e1a2b';ctx.fillRect(0,0,cw,ch);
+  const g=app.game,V=g&&g.phase==='replay'&&g.rp?replayView(g):null;view.V=V;
   computeView(cw,ch,dt);
-  const g=app.game;
   const sx=fx.shake?(Math.random()-.5)*fx.shake:0,sy=fx.shake?(Math.random()-.5)*fx.shake:0;
   ctx.save();ctx.translate(view.cx+sx,view.cy+sy);ctx.rotate(view.a);ctx.scale(view.s,view.s);ctx.translate(-view.wx,-view.wy);
   drawArena(ctx,g);
   if(g){
-    for(const r of g.rings)drawRing(ctx,r,r.i===app.mySlot);
-    drawOrb(ctx,g.orb,g);
+    for(const r of(V?V.rings:g.rings))drawRing(ctx,r,r.i===app.mySlot);
+    drawOrb(ctx,V?V.orb:g.orb,g);
     for(const p of fx.parts){ctx.globalAlpha=Math.min(1,p.l/p.m*1.4);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.283);ctx.fill()}
     ctx.globalAlpha=1;
   }
   ctx.restore();
   if(fx.flash>0){ctx.fillStyle=`rgba(255,255,255,${fx.flash*.35})`;ctx.fillRect(0,0,cw,ch)}
   if(!g)return;
+  if(V)replayBars(ctx,cw,ch,g.rp);
   // labels
   const showNames=app.mode!=='attract';
   ctx.textAlign='center';ctx.textBaseline='bottom';
-  if(showNames)for(const r of g.rings){
+  if(showNames)for(const r of(V?V.rings:g.rings)){
     const[px,py]=w2s(r.x,r.y),off=RO*view.s+14,me=r.i===app.mySlot;
     if(app.mode==='free'&&!me)continue;
     ctx.font=`${me?800:600} ${me?13:12}px 'Instrument Sans', system-ui, sans-serif`;
@@ -1681,7 +1805,7 @@ function render(dt){
     rr(ctx,px-tw/2-6,ly-17,tw+12,19,6);ctx.fill();
     ctx.fillStyle=me?'#ffffff':COL_SOFT[r.team];ctx.fillText(label,px,ly);
   }
-  if(view.zoomed&&showNames){
+  if(view.zoomed&&showNames&&!V){
     const pad=22,top=hud.hidden?pad:66;
     const mark=(x,y,col,r)=>{
       const[px,py]=w2s(x,y);
@@ -1743,7 +1867,22 @@ function updateHud(){
     }
   }else lastCh=-1;
   if(app.mode==='online'&&Net.match&&Net.match.role==='client')$('ping').textContent=Math.round(Net.match.rtt*1000)+' ms';
+  // replay overlay
+  const rep=g.phase==='replay'&&!!g.rp&&ui.hidden;
+  document.body.classList.toggle('replaying',rep);
+  replayUI.hidden=!rep;skipBtn.hidden=!rep;
+  if(rep){
+    const lg=g.lastGoal,who=lg&&lg.by>=0&&g.rings[lg.by]?g.rings[lg.by].name:'';
+    const t1=(lg&&lg.own?'Own goal':who)+(lg?' · '+lg.spd+' km/h':'');
+    if(rpWho.textContent!==t1){rpWho.textContent=t1;rpWho.style.color=lg?(lg.team===0?'#b9c8ff':'#ffc9b0'):''}
+    const humans=g.rings.filter(r=>!r.bot),done=humans.filter(r=>g.skips.has(r.i)).length,mine=app.mySlot>=0&&g.skips.has(app.mySlot);
+    const label=mine?(humans.length>1?`Waiting · ${done}/${humans.length} skipped`:'Skipping…'):(humans.length>1?`Skip replay · ${done}/${humans.length}`:'Skip replay');
+    if(skipBtn.textContent!==label)skipBtn.textContent=label;
+    skipBtn.disabled=mine||app.mySlot<0;
+  }
 }
+const replayUI=$('replayUI'),rpWho=$('rpWho'),skipBtn=$('skipBtn');
+skipBtn.addEventListener('click',()=>{Input.skipQ=true});
 function showEnd(){
   const g=app.game;if(!g||g.phase!=='end')return;
   const [a,b]=g.score;const me=app.mySlot>=0?g.rings[app.mySlot]:null;
@@ -1916,10 +2055,11 @@ function hostFrame(dt){
   if(!g)return;
   const pm=new Map();for(const p of M.room.peers())pm.set(p.peer,p);
   for(const r of g.rings){
-    if(r.local){applyLocalInput(r);continue}
+    if(r.local){if(applyLocalInput(r)&4)g.skips.add(r.i);continue}
     if(r.bot)continue;
     const p=pm.get(r.peer),inp=p&&p.presence&&p.presence.in;
     if(p&&p.presence&&Array.isArray(p.presence.cl))hostClaimFrom(M,g,r,p.presence.cl);
+    if(g.phase==='replay'&&p&&p.presence&&num(p.presence.sk,-1)===g.goalId)g.skips.add(r.i);
     if(Array.isArray(inp)){
       r.ix=clamp(num(inp[0]),-1,1);r.iy=clamp(num(inp[1]),-1,1);
       const ds=num(inp[2])|0,last=M.lastDseq[r.peer];
@@ -1965,7 +2105,7 @@ function clientFrame(dt){
   const g=M.game;
   if(g){
     const me=M.mySlot>=0?g.rings[M.mySlot]:null;
-    if(me){if(applyLocalInput(me)){M.dseq++;M.sendT=0}}else{Input.dashQ=false}
+    if(me){const f=applyLocalInput(me);if(f&1){M.dseq++;M.sendT=0}if(f&4){g.skips.add(M.mySlot);M.room.presence({sk:M.lastGoal}).catch(()=>{})}}else{Input.dashQ=false}
     g.tick(dt);
     if(me){
       const sp=Math.hypot(me.vx,me.vy),cap=DASHV*1.8;if(sp>cap){me.vx*=cap/sp;me.vy*=cap/sp}
@@ -2038,7 +2178,14 @@ function clientApplySnap(s){
   const M=Net.match,g=M.game;
   if(!s||!Array.isArray(s.r)||s.r.length!==g.rings.length||!Array.isArray(s.o))return;
   const prev=g.phase;
-  if(['cd','play','goal','end'].includes(s.ph))g.phase=s.ph;
+  if(['cd','play','goal','replay','end'].includes(s.ph))g.phase=s.ph;
+  if(g.phase==='replay'){
+    if(prev!=='replay'&&M.synced){g.rp=buildReplayPlan(g);g.events.push({type:'replay'})}
+    if(Array.isArray(s.sv)){for(const i of s.sv){const n=num(i,-1)|0;if(n>=0&&n<g.rings.length)g.skips.add(n)}}
+  }else{
+    if(prev==='replay'){g.rp=null;g.skips=new Set();g.events.push({type:'replayEnd'})}
+    if(g.phase==='cd'&&prev!=='cd'){g.rec.frames.length=0;g.rec.touches.length=0;g.rec.sounds.length=0}
+  }
   g.phaseT=num(s.pt);g.time=num(s.tm,g.time);if(Array.isArray(s.sc))g.score=[num(s.sc[0])|0,num(s.sc[1])|0];
   const wasOt=g.ot;g.ot=!!s.ot;if(g.ot&&!wasOt&&M.synced)g.events.push({type:'ot'});
   const wasLp=g.lastPlay;g.lastPlay=!!s.lp;if(g.lastPlay&&!wasLp&&M.synced)g.events.push({type:'lastplay'});
@@ -2088,7 +2235,11 @@ function clientApplySnap(s){
   if(Array.isArray(s.g)){
     const id=num(s.g[0])|0;
     if(M.lastGoal===null)M.lastGoal=id;
-    else if(id!==M.lastGoal){M.lastGoal=id;g.events.push({type:'goal',team:s.g[1]===1?1:0,by:num(s.g[2],-1)|0,spd:num(s.g[3])|0,own:s.g[4]===1})}
+    else if(id!==M.lastGoal){
+      M.lastGoal=id;
+      const ev={id,team:s.g[1]===1?1:0,by:num(s.g[2],-1)|0,spd:num(s.g[3])|0,own:s.g[4]===1};
+      g.lastGoal=ev;g.goalId=id;g.goalT=g.simT;g.events.push(Object.assign({type:'goal'},ev));
+    }
   }else if(M.lastGoal===null)M.lastGoal=0;
   if(g.phase==='end'&&prev!=='end'&&M.synced)g.events.push({type:'end'});
   if(g.phase==='play'&&prev==='cd'&&M.synced)g.events.push({type:'go'});
@@ -2409,11 +2560,11 @@ function tickAll(t){
   if(Net.match){if(Net.match.role==='host')hostFrame(dt);else clientFrame(dt)}
   const g=app.game;
   if(g&&!app.paused&&!(Net.match&&Net.match.game===g)){
-    if(app.mySlot>=0)applyLocalInput(g.rings[app.mySlot]);
+    if(app.mySlot>=0&&applyLocalInput(g.rings[app.mySlot])&4)g.skips.add(app.mySlot);
     if(!g.free){assignRoles(g,dt);for(const r of g.rings)if(r.bot)botControl(g,r,dt)}
     g.tick(dt);
   }
-  if(app.game){handleEvents(app.game);updateFx(dt)}
+  if(app.game){handleEvents(app.game);replayAudio(app.game);updateFx(dt)}
   if(!document.hidden){render(dt);updateHud()}
 }
 function frame(t){tickAll(t);requestAnimationFrame(frame)}

@@ -285,8 +285,8 @@ function createRanked({ relay, store, publicDir }) {
         if (r.bot) continue;
         const pr = pm.get(r.peer), inp = pr && pr.in;
         if (pr && Array.isArray(pr.cl)) claim(M, g, r, pr.cl);
+        if (g.phase === 'replay' && pr && num(pr.sk, -1) === g.goalId) g.skips.add(r.i);   // replay skip votes
         if (M.game === '3d') {
-          if (g.phase === 'replay' && pr && num(pr.sk, -1) === g.goalId) g.skips.add(r.i);
           if (Array.isArray(inp)) {
             r.ix = clamp(num(inp[0]), -1, 1); r.iz = clamp(num(inp[1]), -1, 1);
             const ds = num(inp[2]) | 0, hs = num(inp[3]) | 0;

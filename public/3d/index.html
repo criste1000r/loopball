@@ -559,6 +559,7 @@ const RR=38,RT=10,RO=RR+RT/2,RI=RR-RT/2,HB=36,OR=17,GAP=0.72;
 const MAXV=440,ACC=2600,AIRACC=.38,DASHV=1000,DASHT=0.22,MAXCH=2,CHARGE=1.4,TURN=11;
 const HOPV=560,DHOPV=500,RG=1600,OG=700,ORB_MAX=1900;
 const STEP=1/240,CD_T=2.4,GOAL_T=2.0,KMH=0.1,REC_DT=1/30,REC_KEEP=9;
+const REC_EV=new Set(['hit','bump','dash','hop','wall','clack','post']);   // sounds the replay plays back
 const COL=['#3a62ff','#ff7536'];
 const BOTNAMES=['Vela','Kip','Moro','Tuck','Rhee','Sable','Quill','Juno','Pike','Wren','Ozzy','Lark'];
 const DIFF={
@@ -595,7 +596,7 @@ class Game{
     this.phase=this.free?'play':'cd';this.phaseT=this.free?0:CD_T;
     this.goalId=0;this.lastGoal=null;this.acc=0;this.events=[];this.roleT=0;
     this.fp={last:0,best:0,goals:0};
-    this.simT=0;this.recT=0;this.rec={frames:[],touches:[]};this.rp=null;this.skips=new Set();this.goalT=0;this.replays=!this.free&&!this.attract;
+    this.simT=0;this.recT=0;this.rec={frames:[],touches:[],sounds:[]};this.rp=null;this.skips=new Set();this.goalT=0;this.replays=!this.free&&!this.attract;
     this.kickoff();
     if(this.free)this.respawnOrb(true);
   }
@@ -609,13 +610,14 @@ class Game{
       r.ai={t:0};
     }
     Object.assign(this.orb,{x:L/2,y:OR+60,z:WD/2,vx:0,vy:0,vz:0,last:-1});
-    if(this.rec){this.rec.frames.length=0;this.rec.touches.length=0}
+    if(this.rec){this.rec.frames.length=0;this.rec.touches.length=0;this.rec.sounds.length=0}
   }
   record(){
     const o=this.orb,F=this.rec.frames;
-    F.push({t:this.simT,o:[o.x,o.y,o.z,o.vx,o.vy,o.vz],l:o.last,r:this.rings.map(r=>[r.x,r.y,r.z,r.f,r.stun>0?1:0])});
+    F.push({t:this.simT,o:[o.x,o.y,o.z,o.vx,o.vy,o.vz],l:o.last,r:this.rings.map(r=>[r.x,r.y,r.z,r.f,r.stun>0?1:0,r.ch,r.chT])});
     while(F.length&&F[0].t<this.simT-REC_KEEP)F.shift();
     const T=this.rec.touches;while(T.length&&T[0].t<this.simT-REC_KEEP)T.shift();
+    const S=this.rec.sounds;while(S.length&&S[0].t<this.simT-REC_KEEP)S.shift();
   }
   startReplay(){
     if(!this.replays)return false;
@@ -644,8 +646,12 @@ class Game{
     if(this.phase==='goal'&&GOAL_T-this.phaseT<0.8)scale=0.3;
     this.acc+=dt*scale;let n=0;
     while(this.acc>=STEP&&n<20){
+      const e0=this.events.length;
       this.step(STEP);this.acc-=STEP;n++;this.simT+=STEP;
-      if((this.phase==='play'||this.phase==='goal')&&this.simT-this.recT>=REC_DT){this.recT=this.simT;this.record()}
+      if(this.phase==='play'||this.phase==='goal'){
+        for(let i=e0;i<this.events.length;i++){const e=this.events[i];if(REC_EV.has(e.type))this.rec.sounds.push(Object.assign({t:this.simT},e))}
+        if(this.simT-this.recT>=REC_DT){this.recT=this.simT;this.record()}
+      }
     }
     if(n>=20)this.acc=0;
     if(this.authority)this.phaseLogic(dt);else this.phaseT=Math.max(0,this.phaseT-dt);
@@ -899,7 +905,7 @@ function buildReplayPlan(g){
   for(let k=g.rec.touches.length-1;k>=0;k--){const h=g.rec.touches[k];if(h.t<=Tg+.05&&(by<0||h.i===by)){Tt=h.t;break}}
   const start=Math.max(F[0].t,Math.min(Tt-1.8,Tg-3.2)),end=Math.min(F[F.length-1].t,Tg+1.0);
   if(end-start<1)return null;
-  const rp={start,end,t:start,Tt,Tg,by,frames:F.slice(),idx:0,dur:0};
+  const rp={start,end,t:start,Tt,Tg,by,frames:F.slice(),idx:0,dur:0,sounds:(g.rec.sounds||[]).filter(e=>e.t>=start&&e.t<=end),si:0};
   let t=start;while(t<end&&rp.dur<14){t+=replaySpeed(t,rp)/60;rp.dur+=1/60}
   return rp;
 }
@@ -910,7 +916,7 @@ function replayView(g){
   const a=F[rp.idx],b=F[Math.min(rp.idx+1,F.length-1)];
   const k=b.t>a.t?clamp((rp.t-a.t)/(b.t-a.t),0,1):0,mix=(p,q)=>p+(q-p)*k;
   return{
-    rings:g.rings.map((r,i)=>{const p=a.r[i],q=b.r[i]||p;return{i,team:r.team,x:mix(p[0],q[0]),y:mix(p[1],q[1]),z:mix(p[2],q[2]),f:p[3]+wrap(q[3]-p[3])*k,stun:p[4]?1:0,ch:MAXCH,chT:0}}),
+    rings:g.rings.map((r,i)=>{const p=a.r[i],q=b.r[i]||p;return{i,team:r.team,x:mix(p[0],q[0]),y:mix(p[1],q[1]),z:mix(p[2],q[2]),f:p[3]+wrap(q[3]-p[3])*k,stun:p[4]?1:0,ch:p[5]==null?MAXCH:p[5],chT:p[6]||0}}),
     orb:{x:mix(a.o[0],b.o[0]),y:mix(a.o[1],b.o[1]),z:mix(a.o[2],b.o[2]),vx:mix(a.o[3],b.o[3]),vy:mix(a.o[4],b.o[4]),vz:mix(a.o[5],b.o[5]),last:a.l}
   };
 }
@@ -1088,7 +1094,7 @@ function botDecide(g,r,P){
 /* ================= audio ================= */
 const Sfx={c:null,vol:clamp(num(store.get('vol',store.get('sound',true)===false?0:.8),.8),0,1),last:0,
   init(){if(this.c)return;try{this.c=new(window.AudioContext||window.webkitAudioContext)()}catch{this.c=null}},
-  tone(f,d,type,v,slide){const c=this.c;if(!c||!(this.vol>0)||document.hidden)return;v*=this.vol;try{if(c.state==='suspended')c.resume();const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(Math.min(.0008,v*.01),t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
+  tone(f,d,type,v,slide){const c=this.c;if(!c||!(this.vol>0)||document.hidden)return;v*=this.vol;try{if(c.state==='suspended')c.resume();const rt=this.rate||1;f*=rt;d/=rt;const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(Math.min(.0008,v*.01),t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.03)}catch{}},
   hit(s){const n=performance.now();if(n-this.last<45)return;this.last=n;this.tone(180+Math.min(s,1400)*.35,.07,'triangle',Math.min(.22,.04+s/5000))},
   wall(s){this.tone(120+Math.min(s,1200)*.08,.06,'sine',Math.min(.12,s/9000))},
   dash(){this.tone(560,.13,'sawtooth',.045,.45)},
@@ -1760,6 +1766,26 @@ const tmpCol=window.THREE?new THREE.Color():null;
 function burst(x,y,z,col,n,sp){if(!tmpCol)return;if(REDUCED)n=Math.ceil(n/3);tmpCol.set(col);for(let i=0;i<n&&fx.parts.length<400;i++){const a=Math.random()*6.283,b=Math.random()*Math.PI-Math.PI/2,v=rnd(.2,1)*sp;fx.parts.push({x,y,z,vx:Math.cos(a)*Math.cos(b)*v,vy:Math.abs(Math.sin(b))*v,vz:Math.sin(a)*Math.cos(b)*v,l:rnd(.4,1),r:tmpCol.r,g:tmpCol.g,b:tmpCol.b})}}
 function shake(n){if(!REDUCED)cam.shake=Math.max(cam.shake,n)}
 function haptic(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch{}}
+
+// Replay sound: the hits, bumps and dashes recorded during play are heard again as the replay passes them,
+// pitched down in slow motion; the goal horn plays as the orb crosses the line.
+function replayAudio(g){
+  const rp=g&&g.phase==='replay'?g.rp:null;
+  if(!rp){Sfx.rate=1;return}
+  Sfx.rate=.62+.38*replaySpeed(rp.t,rp);
+  const S=rp.sounds||[];
+  while(rp.si<S.length&&S[rp.si].t<=rp.t){
+    const e=S[rp.si++];if(rp.t-e.t>.3)continue;
+    if(e.type==='hit'){Sfx.hit(e.s);if(e.s>500)burst(e.x,e.y,e.z,'#ffffff',Math.min(14,e.s/90|0),e.s*.45)}
+    else if(e.type==='bump'){Sfx.bump();burst(e.x,e.y,e.z,COL[e.team],18,450)}
+    else if(e.type==='dash'){Sfx.dash()}
+    else if(e.type==='hop'){Sfx.hop&&Sfx.hop(e.dbl)}
+    else if(e.type==='wall'){Sfx.wall(e.s)}
+    else if(e.type==='clack'){Sfx.hit(e.s*.5)}
+    else if(e.type==='post'){Sfx.tone(1500,.12,'sine',.08);burst(e.x,e.y,e.z,'#ffffff',8,260)}
+  }
+  if(!rp.horn&&rp.t>=rp.Tg){rp.horn=true;Sfx.goal();const lg=g.lastGoal;if(lg){const gx=lg.team===0?L+GD/2:-GD/2;burst(gx,GH/2,WD/2,COL[lg.team],70,600);shake(10)}}
+}
 function handleEvents(g){
   for(const e of g.events){
     if(e.type==='goal'){
@@ -1896,8 +1922,8 @@ function drawOverlay(g,cw,ch,V){
   if(V){
     // cinematic bars and a soft vignette while the replay runs
     const bh=Math.round(ch*.075);c.fillStyle='rgba(8,14,24,.82)';c.fillRect(0,0,cw,bh);c.fillRect(0,ch-bh,cw,bh);
-    const sl=replaySpeed(g.rp.t,g.rp)<.6;
-    if(sl){c.fillStyle='rgba(8,14,24,.18)';c.fillRect(0,bh,cw,ch-2*bh)}
+    const dim=clamp((1-replaySpeed(g.rp.t,g.rp))/.74,0,1)*.12;
+    if(dim>.005){c.fillStyle=`rgba(8,14,24,${dim.toFixed(3)})`;c.fillRect(0,bh,cw,ch-2*bh)}
   }
   if(app.mode!=='attract'&&ui.hidden&&!V){
     // orb pointer when off screen
@@ -2280,7 +2306,7 @@ function clientApplySnap(s){
     if(Array.isArray(s.sv)){for(const i of s.sv){const n=num(i,-1)|0;if(n>=0&&n<g.rings.length)g.skips.add(n)}}
   }else{
     if(prev==='replay'){g.rp=null;g.skips=new Set();g.events.push({type:'replayEnd'})}
-    if(g.phase==='cd'&&prev!=='cd'){g.rec.frames.length=0;g.rec.touches.length=0}
+    if(g.phase==='cd'&&prev!=='cd'){g.rec.frames.length=0;g.rec.touches.length=0;g.rec.sounds.length=0}
   }
   g.phaseT=num(s.pt);g.time=num(s.tm,g.time);if(Array.isArray(s.sc))g.score=[num(s.sc[0])|0,num(s.sc[1])|0];
   const wasOt=g.ot;g.ot=!!s.ot;if(g.ot&&!wasOt&&M.synced)g.events.push({type:'ot'});
@@ -2664,7 +2690,7 @@ function tickAll(t){
     if(!g.free){assignRoles(g,dt);for(const r of g.rings)if(r.bot)botControl(g,r,dt)}
     g.tick(dt);
   }
-  if(app.game){handleEvents(app.game);updateFx(dt)}
+  if(app.game){handleEvents(app.game);replayAudio(app.game);updateFx(dt)}
   if(!document.hidden){render(dt);updateHud()}
 }
 function frame(t){tickAll(t);requestAnimationFrame(frame)}
