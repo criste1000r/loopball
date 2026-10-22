@@ -1775,7 +1775,7 @@ function hostFrame(dt){
   assignRoles(g,dt);for(const r of g.rings)if(r.bot)botControl(g,r,dt);
   g.tick(dt);
   M.sendT-=dt;
-  if(M.sendT<=0){M.sendT=1/30;M.room.presence({s:g.snap(g.rings.map(r=>Math.round(M.ack[r.i]||0)))}).catch(()=>{})}
+  if(M.sendT<=0){M.sendT=STANDALONE?1/45:1/30;M.room.presence({s:g.snap(g.rings.map(r=>Math.round(M.ack[r.i]||0)))}).catch(()=>{})}
 }
 async function joinMatch(code,hostPeer,md){
   if(!Net.room||Net.match)return;
@@ -1806,11 +1806,12 @@ function clientFrame(dt){
   const g=M.game;
   if(g){
     const me=M.mySlot>=0?g.rings[M.mySlot]:null;
-    if(me){const f=applyLocalInput(me);if(f&1)M.dseq++;if(f&2)M.hseq++;if(f&4){g.skips.add(M.mySlot);M.room.presence({sk:M.lastGoal}).catch(()=>{})}}else{Input.dashQ=Input.hopQ=false}
+    if(me){const f=applyLocalInput(me);if(f&1)M.dseq++;if(f&2)M.hseq++;if(f&3)M.sendT=0;if(f&4){g.skips.add(M.mySlot);M.room.presence({sk:M.lastGoal}).catch(()=>{})}}else{Input.dashQ=Input.hopQ=false}
     g.tick(dt);
+    if(me){(M.hist||(M.hist=[])).push({t:performance.now(),x:me.x,y:me.y,z:me.z,vx:me.vx,vy:me.vy,vz:me.vz});while(M.hist.length>240)M.hist.shift()}
   }
   M.sendT-=dt;
-  if(M.sendT<=0){M.sendT=.05;const me=g&&M.mySlot>=0?g.rings[M.mySlot]:null;
+  if(M.sendT<=0){M.sendT=STANDALONE?1/40:.05;const me=g&&M.mySlot>=0?g.rings[M.mySlot]:null;
     M.room.presence({in:[me?Math.round(me.ix*100)/100:0,me?Math.round(me.iz*100)/100:0,M.dseq,M.hseq,Math.round(performance.now())]}).catch(()=>{})}
 }
 function clientApplyL(L2){
@@ -1840,6 +1841,15 @@ function clientApplyL(L2){
     renderMatchLobby();
   }
 }
+// Own-ring reconciliation: compare the host's state with where our ring was when the host read that input,
+// so latency alone never pulls us backward; only real differences (bumps, collisions) get corrected.
+function histAt(M,t){
+  const H=M.hist;if(!H||!H.length)return null;
+  if(t<=H[0].t)return H[0];
+  for(let i=H.length-1;i>0;i--){if(H[i-1].t<=t){const a=H[i-1],b=H[i],k=b.t>a.t?clamp((t-a.t)/(b.t-a.t),0,1):0,o={};for(const key in a)o[key]=a[key]+(b[key]-a[key])*k;return o}}
+  return H[H.length-1];
+}
+function shiftHist(M,d){if(M.hist)for(const h of M.hist)for(const k in d)h[k]+=d[k]}
 function clientApplySnap(s){
   const M=Net.match,g=M.game;
   if(!s||!Array.isArray(s.r)||s.r.length!==g.rings.length||!Array.isArray(s.o))return;
@@ -1856,15 +1866,23 @@ function clientApplySnap(s){
   const wasOt=g.ot;g.ot=!!s.ot;if(g.ot&&!wasOt&&M.synced)g.events.push({type:'ot'});
   const wasLp=g.lastPlay;g.lastPlay=!!s.lp;if(g.lastPlay&&!wasLp&&M.synced)g.events.push({type:'lastplay'});
   if(Array.isArray(s.a)&&M.mySlot>=0){const t=num(s.a[M.mySlot]);if(t>0){const smp=(performance.now()-t)/1000;if(smp>0&&smp<2)M.rtt=M.rtt*.85+smp*.15}}
-  const lat=clamp(M.rtt/2,0,.2),hard=g.phase==='cd'||!M.synced;
+  const lat=clamp(M.rtt/2+.016,0,.3),hard=g.phase==='cd'||!M.synced,ackT=M.mySlot>=0&&Array.isArray(s.a)?num(s.a[M.mySlot]):0;
   s.r.forEach((a,i)=>{
     if(!Array.isArray(a))return;const r=g.rings[i],mine=i===M.mySlot;
     const x=num(a[0],r.x),y=num(a[1],r.y),z=num(a[2],r.z),vx=num(a[3]),vy=num(a[4]),vz=num(a[5]),f=num(a[6],r.f);
     if(hard){r.x=x;r.y=y;r.z=z;r.vx=vx;r.vy=vy;r.vz=vz;if(!mine||g.phase!=='cd')r.f=f}
     else{
-      const tx=x+vx*lat,tz=z+vz*lat,ty=Math.max(0,y+vy*lat),ex=tx-r.x,ez=tz-r.z,ey=ty-r.y,el=Math.hypot(ex,ez,ey),k=mine?.22:.55;
-      if(el>160){r.x=tx;r.z=tz;r.y=ty}else{r.x+=ex*k;r.z+=ez*k;r.y+=ey*k}
-      if(mine){r.vx+=(vx-r.vx)*.25;r.vz+=(vz-r.vz)*.25;r.vy+=(vy-r.vy)*.25}else{r.vx=vx;r.vz=vz;r.vy=vy;r.f=f}
+      const h=mine&&ackT>0?histAt(M,ackT+20):null;
+      if(h){
+        const ex=x-h.x,ez=z-h.z,ey=y-h.y,el=Math.hypot(ex,ez),c=el>150?1:el>4?.2:0;
+        if(c){r.x+=ex*c;r.z+=ez*c;shiftHist(M,{x:ex*c,z:ez*c})}
+        if(Math.abs(ey)>60)r.y=Math.max(0,r.y+ey*.5);
+        const evx=vx-h.vx,evz=vz-h.vz;if(Math.hypot(evx,evz)>240){r.vx+=evx*.6;r.vz+=evz*.6}
+      }else{
+        const tx=x+vx*lat,tz=z+vz*lat,ty=Math.max(0,y+vy*lat),ex=tx-r.x,ez=tz-r.z,ey=ty-r.y,el=Math.hypot(ex,ez,ey),k=mine?.22:.55;
+        if(el>160){r.x=tx;r.z=tz;r.y=ty}else{r.x+=ex*k;r.z+=ez*k;r.y+=ey*k}
+        if(mine){r.vx+=(vx-r.vx)*.25;r.vz+=(vz-r.vz)*.25;r.vy+=(vy-r.vy)*.25}else{r.vx=vx;r.vz=vz;r.vy=vy;r.f=f}
+      }
     }
     if(!mine){r.ix=clamp(num(a[7]),-1,1);r.iz=clamp(num(a[8]),-1,1);r.dashT=num(a[11])}
     r.stun=num(a[9]);r.ch=clamp(num(a[10])|0,0,MAXCH);r.goals=num(a[12])|0;
@@ -1873,9 +1891,19 @@ function clientApplySnap(s){
   const o=g.orb,ox=num(s.o[0],o.x),oy=num(s.o[1],o.y),oz=num(s.o[2],o.z),ovx=num(s.o[3]),ovy=num(s.o[4]),ovz=num(s.o[5]);
   if(hard){o.x=ox;o.y=oy;o.z=oz;o.vx=ovx;o.vy=ovy;o.vz=ovz}
   else{
-    const tx=ox+ovx*lat,tz=oz+ovz*lat,ty=Math.max(OR,oy+ovy*lat-OG*lat*lat/2),ex=tx-o.x,ez=tz-o.z,ey=ty-o.y;
-    if(Math.hypot(ex,ez,ey)>130){o.x=tx;o.z=tz;o.y=ty}else{o.x+=ex*.45;o.z+=ez*.45;o.y+=ey*.45}
-    o.vx=ovx;o.vy=ovy-OG*lat;o.vz=ovz;
+    const last=num(s.o[6],-1)|0,me=M.mySlot>=0?g.rings[M.mySlot]:null,sm=me?s.r[M.mySlot]:null;
+    const smx=sm?num(sm[0]):0,smy=sm?num(sm[1]):0,smz=sm?num(sm[2]):0;
+    if(me&&last===M.mySlot&&Math.hypot(ox-smx,oz-smz)<RI-OR+6&&oy<smy+HB+4){
+      // we carry it: keep it inside our own ring, where the host has it relative to us
+      const tx=me.x+(ox-smx),tz=me.z+(oz-smz),ty=Math.max(OR,me.y+(oy-smy));
+      o.x+=(tx-o.x)*.5;o.z+=(tz-o.z)*.5;o.y+=(ty-o.y)*.5;o.vx=me.vx+(ovx-num(sm[3]));o.vz=me.vz+(ovz-num(sm[5]));o.vy=ovy;
+    }else{
+      const near=me&&Math.hypot(o.x-me.x,o.z-me.z)<180;
+      const tx=ox+ovx*lat,tz=oz+ovz*lat,ty=Math.max(OR,oy+ovy*lat-OG*lat*lat/2),ex=tx-o.x,ez=tz-o.z,ey=ty-o.y;
+      if(Math.hypot(ex,ez,ey)>150){o.x=tx;o.z=tz;o.y=ty}else{const k=near?.22:.45;o.x+=ex*k;o.z+=ez*k;o.y+=ey*k}
+      const vy2=ovy-OG*lat;
+      if(!near){o.vx=ovx;o.vy=vy2;o.vz=ovz}else{o.vx+=(ovx-o.vx)*.4;o.vy+=(vy2-o.vy)*.4;o.vz+=(ovz-o.vz)*.4}
+    }
   }
   o.last=num(s.o[6],-1)|0;
   if(Array.isArray(s.g)){
@@ -1889,6 +1917,7 @@ function clientApplySnap(s){
   }else if(M.lastGoal===null)M.lastGoal=0;
   if(g.phase==='end'&&prev!=='end'&&M.synced)g.events.push({type:'end'});
   if(g.phase==='play'&&prev==='cd'&&M.synced)g.events.push({type:'go'});
+  if(hard)M.hist=[];
   M.synced=true;
 }
 function renderMatchLobby(){

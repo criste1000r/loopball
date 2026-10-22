@@ -7,6 +7,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
+// Testing aid only: SIM_LAG_MS adds that much delay each way to every message (leave unset in production).
+const SIM_LAG = Math.max(0, Number(process.env.SIM_LAG_MS) || 0);
+const later = fn => SIM_LAG ? setTimeout(fn, SIM_LAG) : fn();
 const PUB = path.join(__dirname, 'public');
 const MAX_MSG = 16 * 1024;      // biggest message a player may send
 const MAX_PRES = 4096;          // biggest presence object per player per room
@@ -78,7 +81,7 @@ function makeConn(socket) {
   const c = {
     socket, buf: Buffer.alloc(0), frag: null, alive: true, closed: false,
     id: null, rooms: new Map(), tokens: 120, lastFill: Date.now(),
-    send(str) { if (!c.closed && !socket.destroyed) socket.write(frame(1, Buffer.from(str))); },
+    send(str) { const f = frame(1, Buffer.from(str)); later(() => { if (!c.closed && !socket.destroyed) socket.write(f); }); },
     close() {
       if (c.closed) return; c.closed = true;
       try { socket.end(frame(8, Buffer.alloc(0))); } catch {}
@@ -119,7 +122,7 @@ function parse(c) {
     if (fin) {
       const msg = Buffer.concat(c.frag).toString('utf8'); c.frag = null;
       if (msg.length > MAX_MSG) { c.close(); return; }
-      onMessage(c, msg);
+      later(() => { if (!c.closed) onMessage(c, msg); });
     }
   }
 }
@@ -189,7 +192,8 @@ function leaveRoom(c, name) {
 function broadcast(name, str, except) {
   const set = rooms.get(name); if (!set) return;
   const f = frame(1, Buffer.from(str));
-  for (const x of set) if (x !== except && !x.closed && !x.socket.destroyed) x.socket.write(f);
+  const targets = [...set].filter(x => x !== except);
+  later(() => { for (const x of targets) if (!x.closed && !x.socket.destroyed) x.socket.write(f); });
 }
 
 function onClose(c) {
