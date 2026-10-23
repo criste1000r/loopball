@@ -160,7 +160,6 @@ body.replaying #stick,body.replaying #dashBtn,body.replaying #dashMeter,body.rep
 #dashBtn .pip{width:13px;height:13px;border-radius:50%;border:2px solid var(--chalk)}
 #dashBtn .pip.on{background:var(--chalk)}
 #dashMeter{position:fixed;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 18px);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(14,26,43,.78);border:1px solid var(--line);pointer-events:none}
-#dashMeter.locked{opacity:.4}
 #dashMeter .dm-l{font-family:var(--display);font-weight:900;font-size:17px;letter-spacing:.08em;text-transform:uppercase;margin-right:2px}
 #dashMeter .seg{width:54px;height:12px;border-radius:6px;background:rgba(243,246,249,.16);overflow:hidden}
 #dashMeter .seg i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left center;transform:scaleX(1)}
@@ -322,7 +321,7 @@ a.back{text-decoration:none;display:inline-block}
       <p><b>Your ring has a gap.</b> It always faces the way you steer. Drive into the orb and it drops into your ring. Keep moving and you carry it.</p>
       <p><b>Dash fires it.</b> Dashing slams the back of your ring into the orb for a power shot. Stop short and the orb rolls out the front as a pass.</p>
       <p><b>Dash into an opponent to knock them loose.</b> A hit ring goes hollow for half a second and drops the orb. You hold two dashes; each refills in 1.4 seconds.</p>
-      <p><b>Kickoffs start dash-free.</b> After each kickoff, dashes unlock the moment anyone touches the orb, or after 3 seconds.</p>
+      <p><b>Kickoffs start with empty dashes.</b> They refill from the moment play starts, and the kickoff spots switch diagonals every time.</p>
       <p><b>The buzzer waits for the orb.</b> At 0:00, play goes on while someone holds the orb in their ring or it's inside a colored goal zone. The match ends once it's loose on white ice. A goal that ties it sends the game to overtime.</p>
       <p><b>Mastery lives in the spin.</b> Whip your ring around and the edge of the gap flicks the orb. Bank it off the boards. Read the bounce.</p>
       <dl class="keys">
@@ -551,7 +550,7 @@ window.LOOPBALL = { standalone: true };
 const W=1400,H=800,CR=140,MOUTH=230,GD=70,POST=7;
 const RR=33,RT=11,RO=RR+RT/2,RI=RR-RT/2,OR=14,GAP=0.68;
 const MAXV=380,ACC=2300,DASHV=880,DASHT=0.2,MAXCH=2,CHARGE=1.4,TURN=12.5,ORB_MAX=1650;
-const STEP=1/240,CD_T=2.4,GOAL_T=2.6,KMH=0.11,REC_DT=1/30,REC_KEEP=9,KICK_LOCK=3;
+const STEP=1/240,CD_T=2.4,GOAL_T=2.6,KMH=0.11,REC_DT=1/30,REC_KEEP=9;
 const REC_EV=new Set(['hit','bump','dash','wall','clack','post']);   // sounds the replay plays back
 const CREASE=190; // goal-zone radius
 const COL=['#3a62ff','#ff7536'],COL_SOFT=['#a9bbff','#ffc3a6'],TNAME=['Blue','Orange'];
@@ -594,7 +593,9 @@ function botP(r){
   if(r.Pk!==k){r.Pk=k;r.P=styled(DIFF[r.diff]||DIFF.pro,styleOf(r.name))}
   return r.P;
 }
-const KICK={1:[[-330,0]],2:[[-330,-150],[-520,170]],3:[[-330,0],[-500,-230],[-560,230]]};
+// Kickoff spots sit on a diagonal through the orb (mirrored for the other team), so a straight hit heads for a side wall,
+// not a goal; the diagonal flips every kickoff.
+const KICK={1:[[-300,-170]],2:[[-300,-170],[-520,190]],3:[[-300,-170],[-500,200],[-540,-250]]};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const wrap=a=>{while(a>Math.PI)a-=6.283185307179586;while(a<-Math.PI)a+=6.283185307179586;return a};
 const rnd=(a,b)=>a+Math.random()*(b-a);
@@ -624,15 +625,14 @@ class Game{
     this.kickoff();
   }
   kickoff(){
-    // after a kickoff nobody can dash until someone touches the orb (or KICK_LOCK seconds pass),
-    // so a kickoff is a race for the orb rather than a timed dash-and-bump straight into the goal
-    this.kickLock=this.free?0:KICK_LOCK;
+    this.kickN=(this.kickN||0)+1;const side=this.kickN%2?1:-1;
     const cnt=[0,0];
     for(const r of this.rings){
       const k=this.free?[[-300,0]]:(KICK[this.size]||KICK[3]);
       const p=k[cnt[r.team]++%k.length];
-      let x=W/2+p[0],y=H/2+p[1];if(r.team===1){x=W-x;y=H-y}
-      Object.assign(r,{x,y,vx:0,vy:0,f:r.team===0?0:Math.PI,w:0,stun:0,dashT:0,ch:MAXCH,chT:0,cd:0,dashReq:false,carry:false});
+      let x=W/2+p[0],y=H/2+p[1]*side;if(r.team===1){x=W-x;y=H-y}
+      // matches start every kickoff with empty dashes; they refill once play starts
+      Object.assign(r,{x,y,vx:0,vy:0,f:Math.atan2(H/2-y,W/2-x),w:0,stun:0,dashT:0,ch:this.free?MAXCH:0,chT:0,cd:0,dashReq:false,carry:false});
       r.ghost.length=0;r.ai={t:0};
     }
     const o=this.orb;Object.assign(o,{x:W/2,y:H/2,vx:0,vy:0,last:-1});o.trail.length=0;
@@ -680,7 +680,6 @@ class Game{
       }
     }
     if(n>=20)this.acc=0;
-    if(this.phase==='play'&&this.kickLock>0)this.kickLock=Math.max(0,this.kickLock-dt);
     if(this.authority)this.phaseLogic(dt);else this.phaseT=Math.max(0,this.phaseT-dt);
   }
   phaseLogic(dt){
@@ -747,7 +746,7 @@ class Game{
   }
   control(r,dt,frozen){
     if(r.cd>0)r.cd-=dt;if(r.dashT>0)r.dashT-=dt;
-    if(r.ch<MAXCH){r.chT+=dt;if(r.chT>=CHARGE){r.ch++;r.chT=0}}else r.chT=0;
+    if(frozen){}else if(r.ch<MAXCH){r.chT+=dt;if(r.chT>=CHARGE){r.ch++;r.chT=0}}else r.chT=0;
     let ix=r.ix,iy=r.iy;const m=Math.hypot(ix,iy);if(m>1){ix/=m;iy/=m}
     const pf=r.f;
     if(r.stun>0){r.stun-=dt;r.dashReq=false;const k=Math.exp(-2.2*dt);r.vx*=k;r.vy*=k;r.w=0;if(frozen){r.vx=r.vy=0}return}
@@ -756,7 +755,7 @@ class Game{
     if(frozen){r.vx=r.vy=0;r.dashReq=false;return}
     if(r.dashReq){
       r.dashReq=false;
-      if(r.ch>=1&&r.cd<=0&&!(this.kickLock>0)){
+      if(r.ch>=1&&r.cd<=0){
         const dx=Math.cos(r.f),dy=Math.sin(r.f),al=r.vx*dx+r.vy*dy,sp=Math.max(DASHV,al+420);
         const px=r.vx-al*dx,py=r.vy-al*dy;
         r.vx=dx*sp+px*.3;r.vy=dy*sp+py*.3;r.ch--;r.cd=.22;r.dashT=DASHT;
@@ -819,7 +818,7 @@ class Game{
     if(vn>=0)return;
     const e=inner?(r.dashT>0?.9:.18):.6;
     o.vx-=(1+e)*vn*nx;o.vy-=(1+e)*vn*ny;
-    o.last=r.i;this.kickLock=0;
+    o.last=r.i;
     if(-vn>60&&this.rec){const T=this.rec.touches,lt=T[T.length-1];if(!lt||lt.i!==r.i||this.simT-lt.t>.12)T.push({t:this.simT,i:r.i});else lt.t=this.simT}
     if(-vn>220){
       const sp=Math.hypot(o.vx,o.vy);
@@ -856,7 +855,7 @@ class Game{
   }
   snap(ack){
     const o=this.orb,R=Math.round,F=v=>Math.round(v*100)/100;
-    return{ph:this.phase,pt:F(this.phaseT),kl:this.kickLock>0?1:0,tm:Math.round(this.time*10)/10,sc:this.score.slice(),ot:this.ot?1:0,lp:this.lastPlay?1:0,
+    return{ph:this.phase,pt:F(this.phaseT),tm:Math.round(this.time*10)/10,sc:this.score.slice(),ot:this.ot?1:0,lp:this.lastPlay?1:0,
       r:this.rings.map(r=>[R(r.x),R(r.y),R(r.vx),R(r.vy),F(r.f),F(r.ix),F(r.iy),F(Math.max(0,r.stun)),r.ch,F(Math.max(0,r.dashT)),r.goals]),
       o:[R(o.x),R(o.y),R(o.vx),R(o.vy),o.last],
       g:this.lastGoal?[this.lastGoal.id,this.lastGoal.team,this.lastGoal.by,this.lastGoal.spd,this.lastGoal.own?1:0]:null,
@@ -952,7 +951,7 @@ function botControl(g,r,dt){
 // Look-ahead for strong bots: play the next moment forward with and without a dash and keep the better one.
 function simClone(g,r,prune){
   const c=Object.create(Game.prototype),o=g.orb;
-  Object.assign(c,{size:g.size,free:g.free,authority:true,attract:false,kickLock:g.kickLock,score:g.score.slice(),time:1e9,ot:false,carrier:g.carrier,lastPlay:false,
+  Object.assign(c,{size:g.size,free:g.free,authority:true,attract:false,score:g.score.slice(),time:1e9,ot:false,carrier:g.carrier,lastPlay:false,
     phase:'play',phaseT:0,goalId:0,lastGoal:null,acc:0,events:[],fp:{last:0,best:0,goals:0}});
   // rings too far away to matter in the next moment are left out, which keeps team games cheap
   c.rings=[];c.byI=[];
@@ -1917,12 +1916,12 @@ function updateHud(){
     if(me.ch>lastCh&&lastCh>=0&&app.mode!=='attract')Sfx.tone(880,.06,'sine',.05);
     lastCh=me.ch;
     if(!dashEl.hidden){
-      dashEl.classList.toggle('t1',me.team===1);dashEl.classList.toggle('empty',me.ch<1||g.kickLock>0);
+      dashEl.classList.toggle('t1',me.team===1);dashEl.classList.toggle('empty',me.ch<1);
       dashEl.querySelectorAll('.pip').forEach((p,i)=>p.classList.toggle('on',i<me.ch));
       dashProgEl.style.strokeDashoffset=String(100-prog*100);
     }
     if(!dashMeterEl.hidden){
-      dashMeterEl.classList.toggle('t1',me.team===1);dashMeterEl.classList.toggle('locked',g.kickLock>0);
+      dashMeterEl.classList.toggle('t1',me.team===1);
       dashSegs.forEach((s,i)=>{const f=i<me.ch?1:i===me.ch?prog:0;s.firstChild.style.transform=`scaleX(${f})`;s.classList.toggle('full',i<me.ch)});
     }
   }else lastCh=-1;
@@ -2247,8 +2246,6 @@ function clientApplySnap(s){
     if(g.phase==='cd'&&prev!=='cd'){g.rec.frames.length=0;g.rec.touches.length=0;g.rec.sounds.length=0}
   }
   g.phaseT=num(s.pt);g.time=num(s.tm,g.time);if(Array.isArray(s.sc))g.score=[num(s.sc[0])|0,num(s.sc[1])|0];
-  // follow the host's kickoff lock when it changes (a touch seen here first may unlock a moment early)
-  if((s.kl===0||s.kl===1)&&s.kl!==g.klSeen){g.klSeen=s.kl;g.kickLock=s.kl?KICK_LOCK:0}
   const wasOt=g.ot;g.ot=!!s.ot;if(g.ot&&!wasOt&&M.synced)g.events.push({type:'ot'});
   const wasLp=g.lastPlay;g.lastPlay=!!s.lp;if(g.lastPlay&&!wasLp&&M.synced)g.events.push({type:'lastplay'});
   if(Array.isArray(s.a)&&M.mySlot>=0){const t=num(s.a[M.mySlot]);if(t>0){const smp=(performance.now()-t)/1000;if(smp>0&&smp<2)M.rtt=M.rtt*.85+smp*.15}}
