@@ -45,6 +45,7 @@ input[type=range].rngIn{width:100%;accent-color:#f3f6f9;height:28px;cursor:point
 .kbtn{font:inherit;font-weight:700;font-size:14px;padding:7px 6px;border-radius:9px;border:2px solid var(--line);background:transparent;color:var(--chalk);cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kbtn:hover,.kbtn:focus-visible{border-color:var(--chalk);outline:none}
 .kbtn.wait{background:var(--chalk);color:var(--ink);border-color:var(--chalk)}
+#egPrev{position:fixed;inset:0;z-index:30;pointer-events:none;border:0 solid rgba(255,80,80,.5);box-shadow:inset 0 0 0 1px rgba(255,80,80,.9)}
 #tedit{position:fixed;inset:0;z-index:20;touch-action:none;background:rgba(14,26,43,.3)}
 #tedit .tebar{position:absolute;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 10px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:center;background:rgba(14,26,43,.92);border:1px solid var(--line);border-radius:14px;padding:10px 12px;color:var(--chalk);font-size:14px}
 #tedit .tebar b{width:100%;text-align:center;font-weight:600;color:var(--muted)}
@@ -225,6 +226,7 @@ a.back{text-decoration:none;display:inline-block}
 <body>
 <canvas id="cv" aria-label="Loopball arena"></canvas>
 <div id="touch" hidden></div>
+<div id="egPrev" hidden></div>
 <div id="tedit" hidden><div class="tebar"><b>Drag any button to move it · tap one to pick it, then size it</b><div class="tesz"><span id="teWhich">Dash</span><input type="range" class="rngIn" id="teSize" min="60" max="170" step="5" value="100" aria-label="Button size"><span id="teSizeV">100%</span></div><button class="sm" id="teDef">Default</button><button class="sm" id="teDone">Done</button></div></div>
 <div id="stick" hidden><div id="knob"></div></div>
 <div id="dashBtn" hidden><svg class="prog" viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="55"/><circle class="bar" id="dashProg" cx="60" cy="60" r="55" pathLength="100"/></svg><span>DASH</span><div class="pips"><span class="pip on"></span><span class="pip on"></span></div></div>
@@ -341,6 +343,7 @@ a.back{text-decoration:none;display:inline-block}
     <div class="group"><div class="lbl">Camera</div><div class="chips" data-set="cam"><button class="chip" data-v="auto">Auto</button><button class="chip" data-v="follow">Close</button><button class="chip" data-v="full">Whole field</button></div></div>
     <div class="group touchOnly"><div class="lbl">Matches on phones</div><div class="chips" id="setOri"><button class="chip" data-v="land">Landscape</button><button class="chip" data-v="flip">Flipped</button><button class="chip" data-v="port">Portrait</button></div></div>
     <div class="group touchOnly"><div class="lbl">Touch buttons</div><div class="row2"><button class="sm" id="teOpen">Move and resize</button><button class="sm" id="teReset">Default</button></div></div>
+    <div class="group touchOnly"><label class="lbl" for="egIn">Edge guard · <span id="egVal">Off</span></label><input type="range" class="rngIn" id="egIn" min="0" max="48" step="4" value="0"><div class="rng"><span>Off</span><span>Ignores touches near the screen edge</span></div></div>
     <div class="group deskOnly"><div class="lbl">Controls</div><div class="chips" data-set="ctl"><button class="chip" data-v="mouse">Mouse</button><button class="chip" data-v="steer">Steer keys</button><button class="chip" data-v="classic">Classic</button></div></div>
     <div class="group deskOnly"><label class="lbl" for="steerIn1">Steer keys turn speed · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
     <div class="group deskOnly"><div class="lbl">Keys · click one, then press the new key</div><div class="kblist" id="keyList"></div><div class="row2"><button class="sm" id="keysReset">Default keys</button></div></div>
@@ -1439,6 +1442,19 @@ $('teOpen').addEventListener('click',openTouchEdit);
 $('teReset').addEventListener('click',()=>{TL=loadTL(null);store.set('touchLayout',null);applyTouchLayout();toast('Touch buttons are back to default',1500)});
 applyTouchLayout();
 
+// ----- edge guard: touches that start this close to the screen edge are ignored (a palm resting on the edge)
+let EG=clamp(num(store.get('edgeGuard',0)),0,48)|0,egT=0;
+function egSync(){$('egIn').value=EG;$('egVal').textContent=EG?EG+' px':'Off';const pv=$('egPrev');pv.style.borderWidth=EG+'px'}
+function egShow(){const pv=$('egPrev');pv.hidden=!EG;clearTimeout(egT);egT=setTimeout(()=>{pv.hidden=true},1400)}
+$('egIn').addEventListener('input',()=>{EG=clamp(+$('egIn').value,0,48)|0;store.set('edgeGuard',EG);egSync();egShow()});
+egSync();
+function inEdgeGuard(e){return EG>0&&e.pointerType!=='mouse'&&(e.clientX<EG||e.clientY<EG||e.clientX>innerWidth-EG||e.clientY>innerHeight-EG)}
+// where fingers are right now, from touch events (used to tell whether the joystick finger is still down)
+let fingers=[];
+const noteFingers=e=>{fingers=[...e.touches].map(t=>lp(t.clientX,t.clientY))};
+['touchstart','touchmove','touchend','touchcancel'].forEach(t=>window.addEventListener(t,noteFingers,{capture:true,passive:true}));
+function stickFingerDown(){const s=Input.stickT;return !!s&&fingers.some(([x,y])=>Math.hypot(x-s.x,y-s.y)<60)}
+
 (function(){
   const h=$('installHint');if(!STANDALONE||FS.installed)return;
   const ios=/iPhone|iPod|iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -1528,14 +1544,16 @@ function menuKey(e){
 }
 touchEl.addEventListener('pointerdown',e=>{
   Sfx.init();
+  if(inEdgeGuard(e)){e.preventDefault();return}
   if(app.game&&app.game.phase==='replay'){Input.skipQ=true;e.preventDefault();return}
   if(e.pointerType==='mouse'){e.preventDefault();Input.mouse.has=true;Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;if(e.button===0||e.button===2)Input.dashQ=true;return}
   e.preventDefault();
   if(!Input.touchUI){Input.touchUI=true;syncHud();syncOriLabels()}
   const[px,py]=lp(e.clientX,e.clientY);
   if(!touchHit(px,py,false)&&px<layoutW()*.5){
-    // a new touch on the left always takes the stick, so a stick whose finger-up got lost can never stay stuck
-    Input.stickT={id:e.pointerId,ox:px,oy:py,x:px,y:py};placeStick()
+    // a new touch on the left takes the stick only if the stick's finger is really gone (its lift got lost);
+    // while the thumb is still down, extra touches there (a palm, another finger) are ignored
+    if(!stickFingerDown()){Input.stickT={id:e.pointerId,ox:px,oy:py,x:px,y:py};placeStick()}
   }else{Input.dashQ=true;dashEl.classList.add('press');setTimeout(()=>dashEl.classList.remove('press'),110)}
   try{touchEl.setPointerCapture(e.pointerId)}catch{}
 },{passive:false});
