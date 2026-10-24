@@ -194,7 +194,7 @@ function onMessage(c, raw) {
     if (typeof m.room === 'string' && m.room !== '') leaveRoom(c, m.room);
   } else if (m.t === 'pres') {
     setPresence(c, typeof m.room === 'string' ? m.room : '', m.p, MAX_PRES);
-  } else if ((m.t === 'rq' || m.t === 'rx') && ranked) {
+  } else if ((m.t === 'rq' || m.t === 'rx' || m.t === 'fsim' || m.t === 'fstop' || m.t === 'ftest') && ranked) {
     ranked.onMessage(c, m);
   }
 }

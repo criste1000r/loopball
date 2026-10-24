@@ -649,7 +649,8 @@ class Game{
   }
   record(){
     const o=this.orb,F=this.rec.frames;
-    F.push({t:this.simT,o:[o.x,o.y,o.vx,o.vy],l:o.last,r:this.rings.map(r=>[r.x,r.y,r.f,r.stun>0?1:0,r.ch,r.chT,r.dashT>0?1:0])});
+    // what was on screen (online games fade corrections out, see rollback)
+    F.push({t:this.simT,o:[o.x+(o.dox||0),o.y+(o.doy||0),o.vx,o.vy],l:o.last,r:this.rings.map(r=>[r.x+(r.dox||0),r.y+(r.doy||0),r.f,r.stun>0?1:0,r.ch,r.chT,r.dashT>0?1:0])});
     while(F.length&&F[0].t<this.simT-REC_KEEP)F.shift();
     const T=this.rec.touches;while(T.length&&T[0].t<this.simT-REC_KEEP)T.shift();
     const S=this.rec.sounds;while(S.length&&S[0].t<this.simT-REC_KEEP)S.shift();
@@ -862,13 +863,14 @@ class Game{
     }
     if(hs>260)this.events.push({type:'wall',s:hs});
   }
-  snap(ack){
+  snap(ack,age){
     const o=this.orb,R=Math.round,F=v=>Math.round(v*100)/100;
     return{ph:this.phase,pt:F(this.phaseT),tm:Math.round(this.time*10)/10,sc:this.score.slice(),ot:this.ot?1:0,lp:this.lastPlay?1:0,
-      r:this.rings.map(r=>[R(r.x),R(r.y),R(r.vx),R(r.vy),F(r.f),F(r.ix),F(r.iy),F(Math.max(0,r.stun)),r.ch,F(Math.max(0,r.dashT)),r.goals]),
+      r:this.rings.map(r=>[R(r.x),R(r.y),R(r.vx),R(r.vy),F(r.f),F(r.ix),F(r.iy),F(Math.max(0,r.stun)),r.ch,F(Math.max(0,r.dashT)),r.goals,F(r.chT||0),F(Math.max(0,r.cd||0))]),
       o:[R(o.x),R(o.y),R(o.vx),R(o.vy),o.last],
       g:this.lastGoal?[this.lastGoal.id,this.lastGoal.team,this.lastGoal.by,this.lastGoal.spd,this.lastGoal.own?1:0]:null,
       sv:this.phase==='replay'?[...this.skips]:null,
+      ag:age||null,
       a:ack||null};
   }
 }
@@ -1949,7 +1951,8 @@ function drawOrb(c,o,g){
   c.fillStyle='#0f1620';c.beginPath();c.arc(o.x,o.y,OR,0,6.283);c.fill();
   c.fillStyle='rgba(255,255,255,.85)';c.beginPath();c.arc(o.x-3.5,o.y-4,3.2,0,6.283);c.fill();
 }
-function render(dt){
+function render(dt){const g0=app.game;shiftDisplay(g0,1);try{renderFrame(dt)}finally{shiftDisplay(g0,-1)}}
+function renderFrame(dt){
   const cw=cv.clientWidth,ch=cv.clientHeight;
   DPR=Math.min(2,window.devicePixelRatio||1);
   const pw=Math.round(cw*DPR),ph=Math.round(ch*DPR);
@@ -2222,17 +2225,42 @@ function hostStart(){
     for(const h of hs)slots.push({team:t,name:h.name,local:!!h.host,peer:h.host?null:h.peer});
     for(let i=hs.length;i<M.size;i++)slots.push({team:t,name:names[k++],bot:true,diff:M.botDiff});
   }
-  M.started++;M.live=true;M.lastDseq={};M.ack={};
-  M.game=new Game({mode:'match',size:M.size,duration:M.len,slots});
+  M.started++;M.live=true;M.lastDseq={};M.ack={};M.ackAt={};
+  const viaServer=serverCanHost();
+  M.game=new Game({mode:'match',size:M.size,duration:M.len,slots,authority:!viaServer});
   app.game=M.game;app.mode='online';app.mySlot=M.game.rings.findIndex(r=>r.local);app.paused=false;
   clearScuff();view.snap=true;show(null);wake();
   hostPublishL();lobbyPresence();
+  M.sv=null;
+  if(viaServer){
+    Object.assign(M,{sv:{t0:performance.now(),seen:0,fr:0},mySlot:app.mySlot,st:M.started,rtt:.12,dseq:0,synced:false,lastGoal:null,hist:[],ih:[],claim:null,hostHas:false,lastPres:null,sendT:0});
+    window.LOOPBALL.send({t:'fsim',room:'lb-'+M.code,st:M.started});
+  }
+}
+// On the website the server runs friend matches (nobody's device has to keep up for everyone);
+// the person who made the match still runs the lobby. Elsewhere, or if the server can't, their game hosts.
+function serverCanHost(){try{return STANDALONE&&!!window.LOOPBALL&&typeof window.LOOPBALL.send==='function'&&window.LOOPBALL.isConnected()&&localStorage.getItem('lb.p2phost')!=='1'}catch{return false}}
+function simPeer(M,st){return M.room.peers().find(p=>typeof p.peer==='string'&&p.peer.startsWith('sim-')&&p.presence&&p.presence.sv===1&&p.presence.st===st)}
+// the match owner's game while the server runs the match: a player like everyone else
+function hostViaServer(M,g,dt){
+  const now=performance.now(),sp=simPeer(M,M.started);M.sv.fr++;
+  if(sp){M.sv.seen=now;M.sv.fr=0;if(sp.presence!==M.lastPres){M.lastPres=sp.presence;if(sp.presence.s)clientApplySnap(sp.presence.s)}}
+  else if(M.sv.fr>30&&now-(M.sv.seen||M.sv.t0)>(M.sv.seen?2500:3000)){
+    // the server isn't running it (busy, or gone): this game takes over from where things are,
+    // and tells the server so there is only ever one game in charge
+    try{window.LOOPBALL.send({t:'fstop',room:'lb-'+M.code,st:M.started})}catch{}
+    M.sv=null;g.authority=true;M.lastDseq={};if(g.phase==='cd')g.phaseT=Math.max(g.phaseT,1);
+    for(const r of g.rings){r.dox=r.doy=0}g.orb.dox=g.orb.doy=0;
+    return false;
+  }
+  clientGame(M,g,dt);return true;
 }
 function hostRematch(){const M=Net.match;if(!M||M.role!=='host')return;hostSync();hostStart()}
 function hostFrame(dt){
   const M=Net.match,g=M.game;
   M.syncT-=dt;if(M.syncT<=0){M.syncT=.5;hostSync()}
   if(!g)return;
+  if(M.sv&&hostViaServer(M,g,dt))return;
   const pm=new Map();for(const p of M.room.peers())pm.set(p.peer,p);
   for(const r of g.rings){
     if(r.local){if(applyLocalInput(r)&4)g.skips.add(r.i);continue}
@@ -2244,13 +2272,13 @@ function hostFrame(dt){
       r.ix=clamp(num(inp[0]),-1,1);r.iy=clamp(num(inp[1]),-1,1);
       const ds=num(inp[2])|0,last=M.lastDseq[r.peer];
       if(last===undefined)M.lastDseq[r.peer]=ds;else if(ds>last){r.dashReq=true;M.lastDseq[r.peer]=ds}
-      M.ack[r.i]=num(inp[3]);
+      const at=num(inp[3]);if(at!==M.ack[r.i]){M.ack[r.i]=at;(M.ackAt||(M.ackAt={}))[r.i]=performance.now()}
     }else{r.ix=r.iy=0}
   }
   assignRoles(g,dt);for(const r of g.rings)if(r.bot)botControl(g,r,dt);
   g.tick(dt);
   M.sendT-=dt;
-  if(M.sendT<=0){M.sendT=STANDALONE?1/45:1/30;const ack=g.rings.map(r=>Math.round(M.ack[r.i]||0));M.room.presence({s:g.snap(ack)}).catch(()=>{})}
+  if(M.sendT<=0){M.sendT=STANDALONE?1/45:1/30;const now=performance.now(),ack=g.rings.map(r=>Math.round(M.ack[r.i]||0)),age=g.rings.map(r=>M.ackAt&&M.ackAt[r.i]?Math.round(now-M.ackAt[r.i]):0);M.room.presence({s:g.snap(ack,age)}).catch(()=>{})}
 }
 async function joinMatch(code,hostPeer,md){
   if(!Net.room||Net.match)return;
@@ -2279,14 +2307,18 @@ function clientFrame(dt){
     if(host.presence!==M.lastPres){
       M.lastPres=host.presence;const pr=host.presence||{};
       if(pr.L&&typeof pr.L==='object'){const j=JSON.stringify(pr.L);if(j!==M.Ljson){M.Ljson=j;clientApplyL(pr.L)}}
-      if(pr.s&&M.game)clientApplySnap(pr.s);
+      if(pr.s&&M.game&&!(M.st&&!M.rk&&simPeer(M,M.st)))clientApplySnap(pr.s);
     }
+    const sp=M.rk||!M.st?null:simPeer(M,M.st);
+    if(sp&&sp.presence!==M.lastSv){M.lastSv=sp.presence;if(sp.presence.s&&M.game)clientApplySnap(sp.presence.s)}
   }
-  const g=M.game;
+  clientGame(M,M.game,dt);
+}
+function clientGame(M,g,dt){
   if(g){
     const me=M.mySlot>=0?g.rings[M.mySlot]:null;
-    if(me){const f=applyLocalInput(me);if(f&1){M.dseq++;M.sendT=0}if(f&4){g.skips.add(M.mySlot);M.room.presence({sk:M.lastGoal}).catch(()=>{})}}else{Input.dashQ=false}
-    g.tick(dt);
+    if(me){const f=applyLocalInput(me);(M.ih||(M.ih=[])).push({t:performance.now(),ix:me.ix,iy:me.iy,d:f&1});while(M.ih.length&&M.ih[0].t<performance.now()-1500)M.ih.shift();if(f&1){M.dseq++;M.sendT=0}if(f&4){g.skips.add(M.mySlot);M.room.presence({sk:M.lastGoal}).catch(()=>{})}}else{Input.dashQ=false}
+    g.tick(dt);fadeDisplay(g,dt);
     if(me){
       const sp=Math.hypot(me.vx,me.vy),cap=DASHV*1.8;if(sp>cap){me.vx*=cap/sp;me.vy*=cap/sp}
       (M.hist||(M.hist=[])).push({t:performance.now(),x:me.x,y:me.y,vx:me.vx,vy:me.vy});while(M.hist.length>240)M.hist.shift();
@@ -2370,6 +2402,8 @@ function clientApplySnap(s){
   const wasOt=g.ot;g.ot=!!s.ot;if(g.ot&&!wasOt&&M.synced)g.events.push({type:'ot'});
   const wasLp=g.lastPlay;g.lastPlay=!!s.lp;if(g.lastPlay&&!wasLp&&M.synced)g.events.push({type:'lastplay'});
   if(Array.isArray(s.a)&&M.mySlot>=0){const t=num(s.a[M.mySlot]);if(t>0){const smp=(performance.now()-t)/1000;if(smp>0&&smp<2)M.rtt=M.rtt*.85+smp*.15}}
+  if(ROLLBACK&&M.synced&&prev==='play'&&g.phase==='play')clientRollback(M,g,s);
+  else{
   const lat=clamp(M.rtt/2+.016,0,.3),hard=g.phase==='cd'||!M.synced,ackT=M.mySlot>=0&&Array.isArray(s.a)?num(s.a[M.mySlot]):0;
   s.r.forEach((a,i)=>{
     if(!Array.isArray(a))return;const r=g.rings[i];
@@ -2412,6 +2446,7 @@ function clientApplySnap(s){
     }
   }
   o.last=num(s.o[4],-1)|0;
+  }
   if(Array.isArray(s.g)){
     const id=num(s.g[0])|0;
     if(M.lastGoal===null)M.lastGoal=id;
@@ -2421,9 +2456,9 @@ function clientApplySnap(s){
       g.lastGoal=ev;g.goalId=id;g.goalT=g.simT;g.events.push(Object.assign({type:'goal'},ev));
     }
   }else if(M.lastGoal===null)M.lastGoal=0;
-  if(g.phase==='end'&&prev!=='end'&&M.synced)g.events.push({type:'end'});
+  if(g.phase==='end'&&prev!=='end')g.events.push({type:'end'});
   if(g.phase==='play'&&prev==='cd'&&M.synced)g.events.push({type:'go'});
-  if(hard)M.hist=[];
+  if(g.phase==='cd'||!M.synced)M.hist=[];
   M.synced=true;
 }
 function renderMatchLobby(){
@@ -2467,7 +2502,7 @@ const GAME_LABEL='2D';
 const BOTLABEL={rookie:"Rookie",pro:"Pro",elite:"Elite",legend:"Legend"};
 function hostBackToLobby(){
   const M=Net.match;if(!M||M.role!=='host')return;
-  M.live=false;M.game=null;startAttract();hostSync();show('mlobby');renderMatchLobby();
+  M.live=false;M.game=null;M.sv=null;startAttract();hostSync();show('mlobby');renderMatchLobby();
 }
 function hostSetSize(n){
   const M=Net.match;if(!M||M.role!=='host'||M.live||![1,2,3].includes(n))return;
@@ -2730,6 +2765,59 @@ function rkLeft(msg){
 // the main page links straight here with ?go=ranked
 try{if(new URLSearchParams(location.search).get('go')==='ranked')setTimeout(rkOpen,0)}catch{}
 
+
+/* ================= rollback ================= */
+// When the host's update arrives, go back to the moment it describes, take the host's state for every ring
+// and the orb, then replay our own inputs since then to get back to now. What's left over between what was
+// on screen and the corrected state fades out over a few frames instead of snapping. The physics is the same.
+let ROLLBACK=true;try{ROLLBACK=localStorage.getItem('lb.oldnet')!=='1'}catch{}
+function fadeDisplay(g,dt){
+  const k=Math.exp(-dt/.09),f=o=>{if(o.dox||o.doy){o.dox*=k;o.doy*=k;if(Math.abs(o.dox)+Math.abs(o.doy)<.3)o.dox=o.doy=0}};
+  for(const r of g.rings)f(r);f(g.orb);
+}
+function shiftDisplay(g,sign){if(!g)return;const f=o=>{if(o.dox||o.doy){o.x+=sign*o.dox;o.y+=sign*o.doy}};for(const r of g.rings)f(r);f(g.orb)}
+function inputAt(M,t){const H=M.ih;if(!H||!H.length)return null;let e=H[0];for(let i=H.length-1;i>=0;i--)if(H[i].t<=t){e=H[i];break}return e}
+function clientRollback(M,g,s){
+  const now=performance.now(),mi=M.mySlot,me=mi>=0?g.rings[mi]:null,o=g.orb;
+  const ack=me&&Array.isArray(s.a)?num(s.a[mi]):0,age=me&&Array.isArray(s.ag)?num(s.ag[mi]):0;
+  let t0=ack>0?ack+age:now-Math.min(250,M.rtt*500);
+  t0=clamp(t0,now-450,now);
+  // what is on screen right now (true position plus any offset still fading)
+  const disp=g.rings.map(r=>[r.x+(r.dox||0),r.y+(r.doy||0),r.stun]),dO=[o.x+(o.dox||0),o.y+(o.doy||0)];
+  const pre={ox:o.x,oy:o.y,ovx:o.vx,ovy:o.vy,mx:me?me.x:0,my:me?me.y:0,carry:g.carrier===mi&&mi>=0};
+  const keep=me?[me.ix,me.iy]:null;
+  // the host's state at t0
+  s.r.forEach((a,i)=>{
+    if(!Array.isArray(a))return;const r=g.rings[i];
+    r.x=num(a[0],r.x);r.y=num(a[1],r.y);r.vx=num(a[2]);r.vy=num(a[3]);r.f=num(a[4],r.f);r.w=0;
+    if(i!==mi){r.ix=clamp(num(a[5]),-1,1);r.iy=clamp(num(a[6]),-1,1)}
+    r.stun=num(a[7]);r.ch=clamp(num(a[8])|0,0,MAXCH);r.dashT=num(a[9]);r.goals=num(a[10])|0;r.dashReq=false;
+    if(a.length>11){r.chT=clamp(num(a[11]),0,CHARGE);r.cd=clamp(num(a[12]),0,1)}
+  });
+  o.x=num(s.o[0],o.x);o.y=num(s.o[1],o.y);o.vx=num(s.o[2]);o.vy=num(s.o[3]);o.last=num(s.o[4],-1)|0;
+  const sm=me?s.r[mi]:null;
+  M.hostHas=!!(me&&o.last===mi&&sm&&Math.hypot(o.x-num(sm[0]),o.y-num(sm[1]))<RI-OR+6);
+  // replay from t0 to now with our own inputs; everyone else keeps the inputs the host last saw
+  const n=Math.min(110,Math.max(0,Math.round((now-t0)/1000/STEP))),e0=g.events.length;
+  for(let k=0;k<n;k++){
+    const tk=t0+k*STEP*1000;
+    if(me){const e=inputAt(M,tk);if(e){me.ix=e.ix;me.iy=e.iy}
+      for(const h of M.ih)if(h.d&&h.t>tk&&h.t<=tk+STEP*1000){me.dashReq=true;break}}
+    g.step(STEP);
+  }
+  g.events.length=e0;
+  if(keep){me.ix=keep[0];me.iy=keep[1]}
+  // our catch is on its way to the host: keep the orb in our ring where we had it
+  if(pre.carry&&M.claim&&!M.claim.dead&&!M.hostHas){o.x=me.x+(pre.ox-pre.mx);o.y=me.y+(pre.oy-pre.my);o.vx=me.vx;o.vy=me.vy}
+  // whatever moved: fade from where it was drawn (big differences snap)
+  g.rings.forEach((r,i)=>{const dx=disp[i][0]-r.x,dy=disp[i][1]-r.y;if(Math.hypot(dx,dy)<140){r.dox=dx;r.doy=dy}else{r.dox=r.doy=0}
+    // a stun this game hadn't shown yet: play the usual bump so it's clear what happened
+    if(disp[i][2]>0)r.stunSeen=now;
+    else if(num(s.r[i]&&s.r[i][7])>.15&&now-(r.stunSeen||0)>700){r.stunSeen=now;g.events.push({type:'bump',x:r.x,y:r.y,team:1-r.team,i:-1,v:i});}
+  });
+  {const dx=dO[0]-o.x,dy=dO[1]-o.y,st=M.rbStat||(M.rbStat={n:0,os:0,oe:0,me:0});st.n++;st.oe+=Math.hypot(dx,dy);if(me)st.me+=Math.hypot(me.dox||0,me.doy||0);if(Math.hypot(dx,dy)<160){o.dox=dx;o.doy=dy}else{o.dox=o.doy=0;st.os++}}
+}
+
 /* ================= main loop ================= */
 let lastT=performance.now();
 function tickAll(t){
@@ -2762,7 +2850,7 @@ const BgClock=(()=>{
 syncCamLabels();syncCtlLabels();syncSteer();syncOriLabels();
 if(!matchMedia('(any-pointer:fine)').matches)document.querySelectorAll('.deskOnly').forEach(b=>{b.hidden=true});
 startAttract();show('home');applyUrlParams();
-try{if(/[?&]debug\b/.test(location.search)||localStorage.getItem('lb.debug')==='1')window.__lb={app,Net,view}}catch{}
+try{if(/[?&]debug\b/.test(location.search)||localStorage.getItem('lb.debug')==='1')window.__lb={app,Net,view,toLobby:hostBackToLobby}}catch{}
 requestAnimationFrame(frame);
 })();
 </script>

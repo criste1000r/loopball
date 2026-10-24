@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const R = require('./ranks.js');
 
+const nowMs = () => Number(process.hrtime.bigint() / 1000n) / 1000;
 const MATCH_SECONDS = Number(process.env.RANKED_SECONDS) || 180;   // override only for testing
 const SNAP_HZ = 45;
 const JOIN_WAIT = 14;          // seconds to wait for matched players to arrive before bots stand in
@@ -68,6 +69,7 @@ function createRanked({ relay, store, publicDir }) {
   }
   function applyLite() {
     for (const M of matches) if (M.g) for (const r of M.g.rings) if (r.P0) r.P = liteP(r.P0);
+    for (const F of friends.values()) for (const r of F.g.rings) if (r.bot && r.P0) r.P = liteP(r.P0);
   }
 
   /* ---------- players ---------- */
@@ -171,7 +173,7 @@ function createRanked({ relay, store, publicDir }) {
     let code; do code = code5(); while (relay.roomExists((game === '3d' ? 'l3-' : 'lb-') + code));
     const M = {
       game, md, code, room: (game === '3d' ? 'l3-' : 'lb-') + code, eng, slots, humans, bots,
-      state: 'wait', t: 0, sendT: 0, Ljson: '', lastD: {}, lastH: {}, ack: {}, claimDone: {}, best: {}, g: null, endT: 0
+      state: 'wait', t: 0, sendT: 0, Ljson: '', lastD: {}, lastH: {}, ack: {}, ackAt: {}, claimDone: {}, best: {}, g: null, endT: 0
     };
     M.peer = relay.virtualPeer('rk' + code);
     relay.join(M.peer, M.room);
@@ -272,6 +274,24 @@ function createRanked({ relay, store, publicDir }) {
     M.claimDone[r.peer] = id;
   }
 
+  // one player's latest input, catch claim and replay skip vote, as their game last published them
+  function readInput(M, g, r, pr) {
+    const eng = M.eng, num = eng.num, clamp = eng.clamp, inp = pr && pr.in;
+    if (pr && Array.isArray(pr.cl)) claim(M, g, r, pr.cl);
+    if (g.phase === 'replay' && pr && num(pr.sk, -1) === g.goalId) g.skips.add(r.i);
+    if (!Array.isArray(inp)) { r.ix = 0; if (M.game === '3d') r.iz = 0; else r.iy = 0; return; }
+    const d3 = M.game === '3d', ds = num(inp[2]) | 0;
+    r.ix = clamp(num(inp[0]), -1, 1);
+    if (d3) r.iz = clamp(num(inp[1]), -1, 1); else r.iy = clamp(num(inp[1]), -1, 1);
+    if (M.lastD[r.peer] === undefined) M.lastD[r.peer] = ds; else if (ds > M.lastD[r.peer]) { r.dashReq = true; M.lastD[r.peer] = ds; }
+    if (d3) { const hs = num(inp[3]) | 0; if (M.lastH[r.peer] === undefined) M.lastH[r.peer] = hs; else if (hs > M.lastH[r.peer]) { r.hopReq = true; M.lastH[r.peer] = hs; } }
+    // when this input started counting, so each player's game knows exactly which moment a snapshot shows
+    const at = num(inp[d3 ? 4 : 3]); if (at !== M.ack[r.i]) { M.ack[r.i] = at; M.ackAt[r.i] = nowMs(); }
+  }
+  function snapNow(M) {
+    const t = nowMs();
+    return M.g.snap(M.g.rings.map(r => Math.round(M.ack[r.i] || 0)), M.g.rings.map(r => M.ackAt[r.i] ? Math.round(t - M.ackAt[r.i]) : 0));
+  }
   function frame(M, dt) {
     M.t += dt;
     const pm = relay.peersIn(M.room);  // Map peer -> presence
@@ -291,25 +311,7 @@ function createRanked({ relay, store, publicDir }) {
       if (M.humans.every(h => h.gone)) { finish(M, true); return; }
       for (const r of g.rings) {
         if (r.bot) continue;
-        const pr = pm.get(r.peer), inp = pr && pr.in;
-        if (pr && Array.isArray(pr.cl)) claim(M, g, r, pr.cl);
-        if (g.phase === 'replay' && pr && num(pr.sk, -1) === g.goalId) g.skips.add(r.i);   // replay skip votes
-        if (M.game === '3d') {
-          if (Array.isArray(inp)) {
-            r.ix = clamp(num(inp[0]), -1, 1); r.iz = clamp(num(inp[1]), -1, 1);
-            const ds = num(inp[2]) | 0, hs = num(inp[3]) | 0;
-            if (M.lastD[r.peer] === undefined) M.lastD[r.peer] = ds; else if (ds > M.lastD[r.peer]) { r.dashReq = true; M.lastD[r.peer] = ds; }
-            if (M.lastH[r.peer] === undefined) M.lastH[r.peer] = hs; else if (hs > M.lastH[r.peer]) { r.hopReq = true; M.lastH[r.peer] = hs; }
-            M.ack[r.i] = num(inp[4]);
-          } else { r.ix = r.iz = 0; }
-        } else {
-          if (Array.isArray(inp)) {
-            r.ix = clamp(num(inp[0]), -1, 1); r.iy = clamp(num(inp[1]), -1, 1);
-            const ds = num(inp[2]) | 0;
-            if (M.lastD[r.peer] === undefined) M.lastD[r.peer] = ds; else if (ds > M.lastD[r.peer]) { r.dashReq = true; M.lastD[r.peer] = ds; }
-            M.ack[r.i] = num(inp[3]);
-          } else { r.ix = r.iy = 0; }
-        }
+        readInput(M, g, r, pm.get(r.peer));
       }
       eng.assignRoles(g, dt);
       for (const r of g.rings) if (r.bot) eng.botControl(g, r, dt);
@@ -321,8 +323,8 @@ function createRanked({ relay, store, publicDir }) {
     publishL(M);
     M.sendT -= dt;
     if (M.sendT <= 0 && g) {
-      M.sendT = 1 / SNAP_HZ;
-      relay.presence(M.peer, M.room, { s: g.snap(g.rings.map(r => Math.round(M.ack[r.i] || 0))) });
+      M.sendT = Math.max(0, M.sendT + 1 / SNAP_HZ);
+      relay.presence(M.peer, M.room, { s: snapNow(M) });
     }
   }
   function finish(M, aborted) {
@@ -332,6 +334,88 @@ function createRanked({ relay, store, publicDir }) {
       const win = M.g.score[0] > M.g.score[1] ? 0 : 1;
       for (const h of M.humans) if (!h.done) settle(M, h, h.team === win, false);
     }
+  }
+
+
+  /* ---------- friend matches: the server runs the game, so no player's device is the host ---------- */
+  // The player who made the match still owns the lobby (teams, bots, rematch). When they start, their game
+  // asks the server to run it; the server joins the room as one more peer and plays it out from the lobby
+  // the owner publishes. If the server is busy or this never happens, the owner's game runs it as before.
+  const MAX_FRIEND = Number(process.env.MAX_FRIEND_SIMS) || 40;
+  const FROOM_RE = /^(lb|l3)-[a-z]{5}$/, DIFFS = ['rookie', 'pro', 'elite', 'legend'];
+  const friends = new Map();   // room -> sim
+  function friendStart(conn, m) {
+    const room = m.room, st = Number(m.st) | 0;
+    if (typeof room !== 'string' || !FROOM_RE.test(room) || st <= 0 || !conn.id) return;
+    for (const M of matches) if (M.room === room) return;              // ranked rooms are run by ranked play
+    const pr = relay.peersIn(room).get(conn.id);
+    if (!pr || pr.h !== 1 || !pr.L || typeof pr.L !== 'object' || pr.L.st !== st || pr.L.rk) return;
+    const old = friends.get(room);
+    if (old) { if (old.owner === conn.id && old.st === st) return; friendStop(old); }
+    if (friends.size >= MAX_FRIEND || lite >= 5) return;               // too busy: the owner's game hosts instead
+    const L = pr.L, md = [1, 2, 3].includes(L.md) ? L.md : 0;
+    if (!md || !Array.isArray(L.sl) || L.sl.length !== md * 2 || L.sl.some(x => !Array.isArray(x))) return;
+    const game = room.startsWith('l3-') ? '3d' : '2d', eng = engine(game);
+    const du = Math.min(3600, Math.max(30, Number(L.du) || 180)), bd = DIFFS.includes(L.bd) ? L.bd : 'pro';
+    const F = { friend: true, game, eng, room, owner: conn.id, st, md, Lj: '', t: 0, sendT: 0, lastD: {}, lastH: {}, ack: {}, ackAt: {}, claimDone: {}, best: {} };
+    F.g = new eng.Game({ mode: 'match', size: md, duration: du, slots: L.sl.map(x => ({ team: x[0] === 1 ? 1 : 0, name: cleanName(x[2]), bot: x[3] === 1, diff: bd })) });
+    friendSlots(F, L, relay.peersIn(room), 0);
+    F.peer = relay.virtualPeer('sim-' + room.slice(3) + '-' + st);
+    relay.join(F.peer, room);
+    friends.set(room, F);
+  }
+  function friendBotP(F, r) {
+    const eng = F.eng;
+    if (!eng.DIFF || !eng.styled || !eng.styleOf) { r.Pfix = false; return; }
+    r.P0 = eng.styled(eng.DIFF[r.diff] || eng.DIFF.pro, eng.styleOf(r.name)); r.P = liteP(r.P0); r.Pfix = true;
+  }
+  // follow the owner's lobby: players who leave become bots, players who join take over a bot.
+  // Someone missing from the room for a few seconds is played by a bot even before the owner's game says so
+  // (its tab may be in the background).
+  function friendSlots(F, L, pm, dt) {
+    const bd = DIFFS.includes(L.bd) ? L.bd : 'pro', j = JSON.stringify([L.sl, bd]);
+    if (j !== F.Lj) {
+      F.Lj = j; F.bd = bd;
+      F.want = L.sl.map(x => Array.isArray(x) ? { bot: x[3] === 1, peer: x[3] === 1 ? null : x[1] === 'H' ? F.owner : typeof x[1] === 'string' ? x[1] : null, name: cleanName(x[2]) } : null);
+    }
+    F.g.rings.forEach((r, i) => {
+      const w = F.want[i]; if (!w) return;
+      r.name = w.name;
+      let bot = w.bot || !w.peer;
+      if (!bot) { if (pm.has(w.peer)) r.away = 0; else if ((r.away = (r.away || 0) + dt) > 3) bot = true; }
+      if (bot) {
+        if (!r.bot) { r.bot = true; r.peer = null; r.ai = { t: 0 }; }
+        if (r.diff !== F.bd || !r.P0 || r.Pname !== r.name) { r.diff = F.bd; r.Pname = r.name; friendBotP(F, r); }
+      } else if (r.bot || r.peer !== w.peer) {
+        r.bot = false; r.Pfix = false; r.P0 = null; r.peer = w.peer; delete F.lastD[w.peer]; delete F.lastH[w.peer];
+      }
+    });
+  }
+  function friendFrame(F, dt) {
+    F.t += dt;
+    const pm = relay.peersIn(F.room), hp = pm.get(F.owner);
+    if (!hp || !hp.L || hp.L.st !== F.st || F.t > 4 * 3600) return friendStop(F);
+    friendSlots(F, hp.L, pm, dt);
+    const g = F.g, eng = F.eng;
+    if (g.phase !== 'end') {
+      for (const r of g.rings) {
+        if (r.bot) continue;
+        if (r.peer) readInput(F, g, r, pm.get(r.peer)); else { r.ix = 0; if (F.game === '3d') r.iz = 0; else r.iy = 0; }
+      }
+      eng.assignRoles(g, dt);
+      for (const r of g.rings) if (r.bot) eng.botControl(g, r, dt);
+      g.tick(dt);
+      g.events.length = 0;
+    }
+    F.sendT -= dt;
+    if (F.sendT <= 0) {
+      F.sendT = Math.max(0, F.sendT + (g.phase === 'end' ? .5 : 1 / SNAP_HZ));
+      relay.presence(F.peer, F.room, { sv: 1, st: F.st, s: snapNow(F) });
+    }
+  }
+  function friendStop(F) {
+    if (friends.get(F.room) === F) friends.delete(F.room);
+    try { relay.leave(F.peer, F.room); } catch {}
   }
 
   /* ---------- clock ---------- */
@@ -353,6 +437,9 @@ function createRanked({ relay, store, publicDir }) {
         finish(M, true); relay.leave(M.peer, M.room); matches.delete(M);
         for (const h of M.humans) if (byPid.get(h.pid) && byPid.get(h.pid).match === M) byPid.delete(h.pid);
       }
+    }
+    for (const F of [...friends.values()]) {
+      try { friendFrame(F, dt); } catch (e) { console.error('Friend match error', F.room, e); friendStop(F); }
     }
     const spent = Number(process.hrtime.bigint() - now) / 1e6;
     cpuEma = cpuEma * .98 + spent * .02;
@@ -398,16 +485,20 @@ function createRanked({ relay, store, publicDir }) {
   function stats() {
     const q = {}; for (const [k, v] of queues) q[k] = v.length;
     let live = 0; for (const M of matches) if (M.state !== 'done') live++;
-    return { queues: q, live, cpu: Math.round(cpuEma * 100) / 100, lite, store: store.info() };
+    return { queues: q, live, friends: friends.size, cpu: Math.round(cpuEma * 100) / 100, lite, store: store.info() };
   }
 
   function onMessage(conn, m) {
     if (m.t === 'rq') enqueue(conn, m);
     else if (m.t === 'rx') cancel(conn);
+    else if (m.t === 'fsim') friendStart(conn, m);
+    else if (m.t === 'fstop') { const F = friends.get(m.room); if (F && F.owner === conn.id) friendStop(F); }
+    // testing aid only (LB_TEST=1): end a friend match the server runs
+    else if (m.t === 'ftest' && process.env.LB_TEST === '1') { const F = friends.get(m.room); if (F) F.g.endMatch(); }
   }
   function onClose(conn) { cancel(conn); }
 
-  return { onMessage, onClose, leaderboard, profile, stats, _matches: matches, _engine: engine };
+  return { onMessage, onClose, leaderboard, profile, stats, _matches: matches, _friends: friends, _engine: engine };
 }
 
 module.exports = { createRanked, loadEngine };
