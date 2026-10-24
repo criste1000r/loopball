@@ -45,6 +45,7 @@ input[type=range].rngIn{width:100%;accent-color:#f3f6f9;height:28px;cursor:point
 .kbtn{font:inherit;font-weight:700;font-size:14px;padding:7px 6px;border-radius:9px;border:2px solid var(--line);background:transparent;color:var(--chalk);cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kbtn:hover,.kbtn:focus-visible{border-color:var(--chalk);outline:none}
 .kbtn.wait{background:var(--chalk);color:var(--ink);border-color:var(--chalk)}
+#mcap{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(var(--sa-bottom,env(safe-area-inset-bottom,0px)) + 90px);background:rgba(14,26,43,.85);color:var(--chalk);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:700;font-size:14px;pointer-events:none}
 #egPrev{position:fixed;inset:0;z-index:30;pointer-events:none;border:0 solid rgba(255,80,80,.5);box-shadow:inset 0 0 0 1px rgba(255,80,80,.9)}
 #tedit{position:fixed;inset:0;z-index:20;touch-action:none;background:rgba(14,26,43,.3)}
 #tedit .tebar{position:absolute;top:calc(var(--sa-top,env(safe-area-inset-top,0px)) + 10px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:center;background:rgba(14,26,43,.92);border:1px solid var(--line);border-radius:14px;padding:10px 12px;color:var(--chalk);font-size:14px}
@@ -227,6 +228,7 @@ a.back{text-decoration:none;display:inline-block}
 <canvas id="cv" aria-label="Loopball arena"></canvas>
 <div id="touch" hidden></div>
 <div id="egPrev" hidden></div>
+<div id="mcap" hidden>Click to steer with the mouse · Esc lets go</div>
 <div id="tedit" hidden><div class="tebar"><b>Drag any button to move it · tap one to pick it, then size it</b><div class="tesz"><span id="teWhich">Dash</span><input type="range" class="rngIn" id="teSize" min="60" max="170" step="5" value="100" aria-label="Button size"><span id="teSizeV">100%</span></div><button class="sm" id="teDef">Default</button><button class="sm" id="teDone">Done</button></div></div>
 <div id="stick" hidden><div id="knob"></div></div>
 <div id="dashBtn" hidden><svg class="prog" viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="55"/><circle class="bar" id="dashProg" cx="60" cy="60" r="55" pathLength="100"/></svg><span>DASH</span><div class="pips"><span class="pip on"></span><span class="pip on"></span></div></div>
@@ -344,7 +346,11 @@ a.back{text-decoration:none;display:inline-block}
     <div class="group touchOnly"><div class="lbl">Matches on phones</div><div class="chips" id="setOri"><button class="chip" data-v="land">Landscape</button><button class="chip" data-v="flip">Flipped</button><button class="chip" data-v="port">Portrait</button></div></div>
     <div class="group touchOnly"><div class="lbl">Touch buttons</div><div class="row2"><button class="sm" id="teOpen">Move and resize</button><button class="sm" id="teReset">Default</button></div></div>
     <div class="group touchOnly"><label class="lbl" for="egIn">Edge guard · <span id="egVal">Off</span></label><input type="range" class="rngIn" id="egIn" min="0" max="48" step="4" value="0"><div class="rng"><span>Off</span><span>Ignores touches near the screen edge</span></div></div>
-    <div class="group deskOnly"><div class="lbl">Controls</div><div class="chips" data-set="ctl"><button class="chip" data-v="mouse">Mouse</button><button class="chip" data-v="steer">Steer keys</button><button class="chip" data-v="classic">Classic</button></div></div>
+    <div class="group deskOnly"><div class="lbl">Controls</div><div class="chips" data-set="ctl"><button class="chip" data-v="mouse">Mouse</button><button class="chip" data-v="mstick">Mouse stick</button><button class="chip" data-v="mfixed">Fixed stick</button><button class="chip" data-v="steer">Steer keys</button><button class="chip" data-v="classic">Classic</button></div><p class="note" style="margin:0;font-size:13px">Mouse modes keep the cursor inside the game while you play. Esc lets it go.</p></div>
+    <div class="group deskOnly" id="msGroup" hidden><div class="lbl">Mouse stick</div><div class="chips" id="msHold"><button class="chip" data-v="none">No hold</button><button class="chip" data-v="left">Hold left</button><button class="chip" data-v="right">Hold right</button></div>
+      <label class="lbl" for="msSize">Stick size · <span id="msSizeV">80 px</span></label><input type="range" class="rngIn" id="msSize" min="40" max="140" step="5" value="80">
+      <label class="lbl" for="msSens">Sensitivity · <span id="msSensV">100%</span></label><input type="range" class="rngIn" id="msSens" min="30" max="250" step="10" value="100">
+      <p class="note" style="margin:0;font-size:13px" id="msNote"></p></div>
     <div class="group deskOnly"><label class="lbl" for="steerIn1">Steer keys turn speed · <span class="steerVal">220°/s</span></label><input type="range" class="steerIn" id="steerIn1" min="90" max="450" step="10" value="220"><div class="rng"><span>Precise</span><span>Sharp</span></div></div>
     <div class="group deskOnly"><div class="lbl">Keys · click one, then press the new key</div><div class="kblist" id="keyList"></div><div class="row2"><button class="sm" id="keysReset">Default keys</button></div></div>
     <div class="group" id="padGroup"><div class="lbl">Controller · select one, then press the button</div><p class="note" id="padNote" style="margin:0"></p><div class="kblist" id="padList"></div><div class="row2"><button class="sm" id="padReset">Default buttons</button></div></div>
@@ -1163,6 +1169,7 @@ const $=id=>document.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d'),ui=$('ui'),hud=$('hud'),touchEl=$('touch'),stickEl=$('stick'),knobEl=$('knob'),dashEl=$('dashBtn');
 let curScreen='home';
 function show(id){
+  if(id&&document.pointerLockElement){try{document.exitPointerLock()}catch{}}
   curScreen=id;
   ui.hidden=!id;
   document.querySelectorAll('.screen').forEach(s=>{s.hidden=s.id!=='s-'+id});
@@ -1173,12 +1180,12 @@ let toastT=0;
 function toast(msg,ms=2600){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},ms)}
 
 const settings={size:store.get('size',2),diff:store.get('diff','pro'),len:store.get('len',180),osize:store.get('osize',2),olen:180,cam:store.get('cam','auto'),ctl:store.get('ctl','mouse'),steer:clamp(num(store.get('steer',220),220),90,450)};
-if(!['mouse','steer','classic'].includes(settings.ctl))settings.ctl='mouse';
-const CTL_LABEL={mouse:'Controls: Mouse',steer:'Controls: Steer keys',classic:'Controls: Classic keys'};
+if(!['mouse','mstick','mfixed','steer','classic'].includes(settings.ctl))settings.ctl='mouse';
+const CTL_LABEL={mouse:'Controls: Mouse',mstick:'Controls: Mouse stick',mfixed:'Controls: Fixed stick',steer:'Controls: Steer keys',classic:'Controls: Classic keys'};
 function syncCtlLabels(){document.querySelectorAll('.ctlBtn').forEach(b=>{b.textContent=CTL_LABEL[settings.ctl]});document.body.classList.toggle('mouse-ctl',settings.ctl==='mouse')}
 function syncSteer(){document.querySelectorAll('.steerIn').forEach(i=>{i.value=settings.steer});document.querySelectorAll('.steerVal').forEach(e=>{e.textContent=settings.steer+'°/s'})}
 document.querySelectorAll('.steerIn').forEach(i=>i.addEventListener('input',()=>{settings.steer=clamp(Math.round(+i.value),90,450);store.set('steer',settings.steer);syncSteer()}));
-function cycleCtl(){const o=['mouse','steer','classic'];settings.ctl=o[(o.indexOf(settings.ctl)+1)%3];store.set('ctl',settings.ctl);Input.steerH=null;syncCtlLabels();toast(settings.ctl==='mouse'?'Mouse: point where to go · click to dash':settings.ctl==='steer'?'Steer keys: W to drive · A/D to turn · S to brake':'Classic keys: WASD in 8 directions',2200)}
+function cycleCtl(){const o=['mouse','mstick','mfixed','steer','classic'];settings.ctl=o[(o.indexOf(settings.ctl)+1)%5];store.set('ctl',settings.ctl);Input.steerH=null;syncCtlLabels();toast(settings.ctl==='mouse'?'Mouse: point where to go · click to dash':settings.ctl==='steer'?'Steer keys: W to drive · A/D to turn · S to brake':'Classic keys: WASD in 8 directions',2200)}
 if(!['auto','follow','full'].includes(settings.cam))settings.cam='auto';
 function syncChips(){
   document.querySelectorAll('[data-set]').forEach(g=>{const k=g.dataset.set;g.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String(String(settings[k])===c.dataset.v)))});
@@ -1279,7 +1286,7 @@ let setFrom='home';
 function openSettings(){setFrom=curScreen==='pause'?'pause':'home';syncSettings();show('settings')}
 function closeSettings(){kbWait=null;pbWait=null;show(setFrom)}
 function syncSettings(){
-  setVol(Sfx.vol,false);syncChips();syncSteer();renderKeys();syncOriLabels();syncCamChips();
+  setVol(Sfx.vol,false);syncChips();syncSteer();renderKeys();syncOriLabels();syncCamChips();syncMouseSettings();
   const touch=Input.touchUI||matchMedia('(pointer:coarse)').matches;
   document.querySelectorAll('#s-settings .touchOnly').forEach(e=>{e.hidden=!touch});
   renderPad();$('padGroup').hidden=!(matchMedia('(any-pointer:fine)').matches||padConnected());
@@ -1455,6 +1462,99 @@ const noteFingers=e=>{fingers=[...e.touches].map(t=>lp(t.clientX,t.clientY))};
 ['touchstart','touchmove','touchend','touchcancel'].forEach(t=>window.addEventListener(t,noteFingers,{capture:true,passive:true}));
 function stickFingerDown(){const s=Input.stickT;return !!s&&fingers.some(([x,y])=>Math.hypot(x-s.x,y-s.y)<60)}
 
+// ----- PC mouse: the cursor stays captured in the game while playing, plus two mouse-joystick modes
+// Mouse: point where to go (as before).  Mouse stick: hold a button, a joystick appears at the cursor.
+// Fixed stick: a joystick that stays on screen; the mouse lives inside it.
+const MS={locked:false,noLock:false,vx:0,vy:0,cx:0,cy:0,kx:0,ky:0,held:false,vis:false,
+  hold:['none','left','right'].includes(store.get('msHold','left'))?store.get('msHold','left'):'left',
+  size:clamp(num(store.get('msSize',80)),40,140)|0,sens:clamp(num(store.get('msSens',1)),.3,2.5)};
+function mouseMode(){return !Input.touchUI&&['mouse','mstick','mfixed'].includes(settings.ctl)}
+function mouseJoy(){return !Input.touchUI&&(settings.ctl==='mstick'||settings.ctl==='mfixed')}
+function holdBtn(){if(settings.ctl==='mstick')return MS.hold==='right'?2:0;if(settings.ctl==='mfixed')return MS.hold==='right'?2:MS.hold==='left'?0:-1;return -1}
+function requestLock(){
+  if(!mouseMode()||MS.locked||MS.noLock||!inPlay())return;
+  try{const p=document.body.requestPointerLock();if(p&&p.catch)p.catch(()=>{MS.noLock=true})}catch{MS.noLock=true}
+}
+document.addEventListener('pointerlockerror',()=>{MS.noLock=true});
+document.addEventListener('pointerlockchange',()=>{
+  const was=MS.locked;MS.locked=document.pointerLockElement===document.body;
+  if(MS.locked){MS.vx=Input.mouse.has?Input.mouse.x:innerWidth/2;MS.vy=Input.mouse.has?Input.mouse.y:innerHeight/2;MS.kx=MS.ky=0;MS.held=false}
+  else if(was){MS.held=false;if(holdBtn()>=0){MS.kx=MS.ky=0}if(inPlay())openPause()}   // Esc (or leaving the window) lets go and pauses
+});
+function mouseButton(btn,down){
+  const hb=holdBtn();
+  if(btn===hb){
+    if(down){MS.held=true;if(settings.ctl==='mstick'){MS.cx=MS.vx;MS.cy=MS.vy}MS.kx=MS.ky=0}
+    else{MS.held=false;MS.kx=MS.ky=0}
+    return;
+  }
+  if(!down)return;
+  if(app.game&&app.game.phase==='replay'){Input.skipQ=true;return}
+  if(btn===1){if(HAS_HOP)Input.hopQ=true;else Input.dashQ=true;return}
+  if(hb<0){if(btn===0)Input.dashQ=true;else if(btn===2){if(HAS_HOP)Input.hopQ=true;else Input.dashQ=true}}
+  else if(btn===0||btn===2)Input.dashQ=true;      // with a hold button, the other button dashes
+}
+// buttons: per-button press/release (a second button pressed while one is held only shows up here)
+document.addEventListener('mousedown',e=>{
+  if(!inPlay()||!(MS.locked||e.target===touchEl))return;
+  if(!MS.locked&&mouseMode()&&!MS.noLock){requestLock();return}     // the first click captures the mouse
+  e.preventDefault();Sfx.init();mouseButton(e.button,true);
+},true);
+document.addEventListener('mouseup',e=>{if(inPlay()||MS.held)mouseButton(e.button,false)},true);
+document.addEventListener('contextmenu',e=>{if(MS.locked)e.preventDefault()});
+document.addEventListener('mousemove',e=>{
+  if(!mouseMode())return;
+  const dx=e.movementX||0,dy=e.movementY||0;
+  if(MS.locked){MS.vx=clamp(MS.vx+dx,0,innerWidth);MS.vy=clamp(MS.vy+dy,0,innerHeight);if(settings.ctl==='mouse'){Input.mouse.x=MS.vx;Input.mouse.y=MS.vy;Input.mouse.has=true}}
+  else{MS.vx=e.clientX;MS.vy=e.clientY}
+  if(mouseJoy()&&inPlay()){
+    const steer=settings.ctl==='mfixed'?(MS.hold==='none'||MS.held):MS.held;
+    if(steer){MS.kx+=dx*MS.sens;MS.ky+=dy*MS.sens;const d=Math.hypot(MS.kx,MS.ky),R=MS.size;if(d>R){MS.kx*=R/d;MS.ky*=R/d}}
+  }
+});
+ui.addEventListener('click',()=>{if(inPlay())requestLock()});   // Kick off / Resume clicks capture the mouse straight away
+function mouseStickVec(){if(!mouseJoy()||!inPlay())return null;const x=MS.kx/MS.size,y=MS.ky/MS.size;return Math.hypot(x,y)>.08?[x,y]:null}
+function fixedCenter(){return[Math.max(16,innerWidth*.04)+MS.size+30,innerHeight-MS.size-48]}
+// each frame: place the mouse joystick, show the capture hint
+function mouseFrame(){
+  const joy=mouseJoy()&&inPlay()&&app.mySlot>=0;
+  if(joy){
+    MS.vis=true;const R=MS.size,fixed=settings.ctl==='mfixed',[fx,fy]=fixedCenter();
+    const cx=fixed?fx:(MS.held?MS.cx:MS.vx),cy=fixed?fy:(MS.held?MS.cy:MS.vy),st=stickEl.style;
+    st.width=st.height=2*R+'px';st.margin=(-R)+'px 0 0 '+(-R)+'px';st.left=cx+'px';st.top=cy+'px';
+    st.opacity=fixed||MS.held?'1':'.3';knobEl.style.transform=`translate(${MS.kx}px,${MS.ky}px)`;
+  }else if(MS.vis){MS.vis=false;const st=stickEl.style;st.width=st.height=st.margin='';placeStick()}
+  const hint=$('mcap');if(hint){const h=!(inPlay()&&mouseMode()&&!MS.locked&&!MS.noLock);if(hint.hidden!==h)hint.hidden=h}
+}
+// the game's own cursor while the mouse is captured, with a line to your ring that brightens with speed
+function drawMouseCursor(c,mx,my){
+  if(!MS.locked||!inPlay())return;
+  const ctl=settings.ctl;if(!(ctl==='mouse'||(ctl==='mstick'&&!MS.held)))return;
+  const x=MS.vx,y=MS.vy,g=app.game,me=g&&app.mySlot>=0?g.rings[app.mySlot]:null;
+  if(ctl==='mouse'&&me&&mx!=null){
+    const v=mouseStick(me),m=Math.min(1,Math.hypot(v[0],v[1]));
+    c.save();c.strokeStyle=`rgba(243,246,249,${(.12+.6*m).toFixed(2)})`;c.lineWidth=1.5+2.5*m;c.setLineDash([7,7]);
+    c.beginPath();c.moveTo(mx,my);c.lineTo(x,y);c.stroke();c.restore();
+  }
+  c.fillStyle='rgba(14,26,43,.55)';c.beginPath();c.arc(x,y,10,0,6.283);c.fill();
+  c.strokeStyle='#f3f6f9';c.lineWidth=2;c.beginPath();c.arc(x,y,10,0,6.283);c.stroke();
+  c.fillStyle='#f3f6f9';c.beginPath();c.arc(x,y,2.6,0,6.283);c.fill();
+}
+// settings for the mouse sticks
+function syncMouseSettings(){
+  const joy=settings.ctl==='mstick'||settings.ctl==='mfixed';$('msGroup').hidden=!joy;
+  const hold=settings.ctl==='mstick'&&MS.hold==='none'?'left':MS.hold;
+  document.querySelectorAll('#msHold .chip').forEach(c=>{c.setAttribute('aria-pressed',String(c.dataset.v===hold));if(c.dataset.v==='none')c.hidden=settings.ctl==='mstick'});
+  $('msSize').value=MS.size;$('msSizeV').textContent=MS.size+' px';$('msSens').value=Math.round(MS.sens*100);$('msSensV').textContent=Math.round(MS.sens*100)+'%';
+  const hb=holdBtn(),other=hb===0?'Right button':'Left button';
+  $('msNote').textContent=hb<0?`Move the mouse to push the stick; it stays where you leave it. Left button dashes${HAS_HOP?', right button hops':''}.`
+    :`Hold the ${hb===0?'left':'right'} button and move the mouse to steer; let go to stop. ${other} dashes${HAS_HOP?'; middle button or Space hops':''}.`;
+}
+$('msHold').addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c)return;MS.hold=c.dataset.v;store.set('msHold',MS.hold);MS.kx=MS.ky=0;syncMouseSettings()});
+$('msSize').addEventListener('input',()=>{MS.size=clamp(+$('msSize').value,40,140)|0;store.set('msSize',MS.size);syncMouseSettings()});
+$('msSens').addEventListener('input',()=>{MS.sens=clamp(+$('msSens').value/100,.3,2.5);store.set('msSens',MS.sens);syncMouseSettings()});
+document.querySelectorAll('#s-settings [data-set="ctl"]').forEach(g=>g.addEventListener('click',()=>{MS.kx=MS.ky=0;MS.held=false;syncMouseSettings()}));
+
 (function(){
   const h=$('installHint');if(!STANDALONE||FS.installed)return;
   const ios=/iPhone|iPod|iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -1499,7 +1599,7 @@ function syncHud(){
   $('board').hidden=app.mode==='free';$('fpInfo').hidden=app.mode!=='free';
   $('ping').hidden=!(playing&&app.mode==='online'&&Net.match&&Net.match.role==='client');
   const showTouch=playing&&Input.touchUI;
-  touchEl.hidden=!playing;stickEl.hidden=!showTouch;dashEl.hidden=!showTouch||app.mySlot<0;
+  touchEl.hidden=!playing;stickEl.hidden=!(showTouch||(playing&&typeof mouseJoy==='function'&&mouseJoy()&&app.mySlot>=0));dashEl.hidden=!showTouch||app.mySlot<0;
   $('dashMeter').hidden=!(playing&&!Input.touchUI&&app.mySlot>=0);
   $('fsBtn').hidden=!(playing&&(FS.can||FS.ios)&&!FS.installed);
   if(!playing){Input.stickT=null;Input.keys.clear();document.body.classList.remove('replaying');$('replayUI').hidden=true;$('skipBtn').hidden=true}
@@ -1546,7 +1646,8 @@ touchEl.addEventListener('pointerdown',e=>{
   Sfx.init();
   if(inEdgeGuard(e)){e.preventDefault();return}
   if(app.game&&app.game.phase==='replay'){Input.skipQ=true;e.preventDefault();return}
-  if(e.pointerType==='mouse'){e.preventDefault();Input.mouse.has=true;Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;if(e.button===0||e.button===2)Input.dashQ=true;return}
+  // mouse: only the position here (cancelling pointerdown would also cancel mousedown, where the buttons are handled)
+  if(e.pointerType==='mouse'){if(!MS.locked){Input.mouse.has=true;Input.mouse.x=e.clientX;Input.mouse.y=e.clientY}return}
   e.preventDefault();
   if(!Input.touchUI){Input.touchUI=true;syncHud();syncOriLabels()}
   const[px,py]=lp(e.clientX,e.clientY);
@@ -1571,7 +1672,7 @@ const noFingers=e=>{if(!e.touches||e.touches.length===0){if(Input.stickT){Input.
 window.addEventListener('touchend',noFingers,true);window.addEventListener('touchcancel',noFingers,true);
 const dropStick=()=>{if(Input.stickT){Input.stickT=null;placeStick()}};
 window.addEventListener('blur',dropStick);document.addEventListener('visibilitychange',dropStick);
-window.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'){Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;Input.mouse.has=true}},{passive:true});
+window.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&!MS.locked){Input.mouse.x=e.clientX;Input.mouse.y=e.clientY;Input.mouse.has=true}},{passive:true});
 touchEl.addEventListener('contextmenu',e=>e.preventDefault());
 function placeStick(){
   const s=Input.stickT;
@@ -1582,6 +1683,7 @@ function placeStick(){
 }
 placeStick();
 function screenStick(){
+  const ms=mouseStickVec();if(ms)return ms;
   const s=Input.stickT;
   if(s){const dx=(s.x-s.ox)/60,dy=(s.y-s.oy)/60,d=Math.hypot(dx,dy);return d>1?[dx/d,dy/d]:[dx,dy]}
   const p=Input.pad;
@@ -1869,6 +1971,7 @@ function render(dt){
   if(fx.flash>0){ctx.fillStyle=`rgba(255,255,255,${fx.flash*.35})`;ctx.fillRect(0,0,cw,ch)}
   if(!g)return;
   if(V)replayBars(ctx,cw,ch,g.rp);
+  {const me=app.mySlot>=0?g.rings[app.mySlot]:null;if(me&&!V){const[x,y]=w2s(me.x,me.y);drawMouseCursor(ctx,x,y)}else drawMouseCursor(ctx,null,0)}
   // labels
   const showNames=app.mode!=='attract';
   ctx.textAlign='center';ctx.textBaseline='bottom';
@@ -2631,7 +2734,7 @@ try{if(new URLSearchParams(location.search).get('go')==='ranked')setTimeout(rkOp
 let lastT=performance.now();
 function tickAll(t){
   const dt=Math.min(.05,Math.max(0,(t-lastT)/1000));lastT=t;Input.dt=dt||1/60;
-  syncOrient();
+  syncOrient();mouseFrame();
   pollPad(dt);
   if(Net.match){if(Net.match.role==='host')hostFrame(dt);else clientFrame(dt)}
   const g=app.game;
