@@ -121,6 +121,8 @@ footer{color:var(--muted);font-size:13px}
 .lb .mm{font-variant-numeric:tabular-nums;font-weight:700}
 .lb .empty{display:block;color:var(--muted);background:none}
 .sky{display:flex;flex-direction:column;gap:12px}
+.sky .sh{flex-direction:column;align-items:flex-start;gap:6px}
+.sky .sh .sub,.sky .note{font-size:15px;color:var(--muted);max-width:70ch;margin:0}
 .ladder{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 @media (max-width:860px){.ladder{grid-template-columns:repeat(5,1fr)}}
 .ladder li{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;padding:10px 4px;border-radius:12px;background:rgba(23,40,64,.55);border:1px solid var(--line);min-width:0}
@@ -211,7 +213,7 @@ footer{color:var(--muted);font-size:13px}
 
   <section class="sky" aria-labelledby="skyH">
     <div class="sh"><h2 id="skyH">The ranks</h2><span class="sub">Seven ranks with three divisions each, then three peaks with no divisions at all.</span></div>
-    <p class="note" style="font-size:13px">When few people are online, some ranked opponents are bots matched to your rating. The end-of-match screen shows who was a bot.</p>
+    <p class="note">When few people are online, some ranked opponents are bots matched to your rating. The end-of-match screen shows who was a bot.</p>
     <ol class="ladder" id="ladder"></ol>
   </section>
 
