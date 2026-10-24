@@ -1978,7 +1978,7 @@ function handleEvents(g){
       shake(14);fx.flash=.5;Sfx.goal();haptic([30,40,60]);
       const who=e.by>=0&&g.rings[e.by]?g.rings[e.by].name:'';
       fx.banner={t:0,text:e.own&&!g.free?'OWN GOAL':'GOAL',sub:(who&&!g.free?who+' · ':'')+e.spd+' km/h',col:COL[e.team]};
-    }else if(e.type==='bump'){burst(e.x,e.y,e.z,COL[e.team],22,400);shake(6);Sfx.bump();if(e.v===app.mySlot)haptic(40)}
+    }else if(e.type==='bump'){burst(e.x,e.y,e.z,COL[e.team],22,400);shake(6);Sfx.bump();{const v=app.game&&app.game.rings[e.v];if(v)v.fxT=performance.now()}if(e.v===app.mySlot)haptic(40)}
     else if(e.type==='hit'){if(e.s>500)burst(e.x,e.y,e.z,'#ffffff',Math.min(16,e.s/80|0),e.s*.4);Sfx.hit(e.s);if(e.s>900)shake(3)}
     else if(e.type==='dash'){if(e.i===app.mySlot)Sfx.dash();const r=g.rings[e.i];if(r)burst(r.x,r.y+HB/2,r.z,COL[r.team],8,180)}
     else if(e.type==='hop'){if(e.i===app.mySlot)Sfx.hop(e.dbl)}
@@ -2937,9 +2937,8 @@ function clientRollback(M,g,s){
   if(keep){me.ix=keep[0];me.iz=keep[1]}
   if(pre.carry&&M.claim&&!M.claim.dead&&!M.hostHas){o.x=me.x+(pre.ox-pre.mx);o.z=me.z+(pre.oz-pre.mz);o.y=Math.max(OR,me.y+(pre.oy-pre.my));o.vx=me.vx;o.vz=me.vz;o.vy=Math.max(me.vy,0)}
   g.rings.forEach((r,i)=>{const dx=disp[i][0]-r.x,dy=disp[i][1]-r.y,dz=disp[i][2]-r.z;if(Math.hypot(dx,dy,dz)<150){r.dox=dx;r.doy=dy;r.doz=dz}else{r.dox=r.doy=r.doz=0}
-    // stuns only count down, so a bigger number than last update means a new hit
-    const sst=num(s.r[i]&&s.r[i][9]),fresh=sst>.15&&sst>(r.snapStun||0)+.05;r.snapStun=sst;
-    if(fresh&&!(disp[i][3]>0))g.events.push({type:'bump',x:r.x,y:r.y+HB/2,z:r.z,team:1-r.team,i:-1,v:i});
+    // a ring that wasn't stunned on screen is now: play the usual hit (sound, burst, shake) unless it just played
+    if(r.stun>0&&!(disp[i][3]>0)&&now-(r.fxT||0)>400)g.events.push({type:'bump',x:r.x,y:r.y+HB/2,z:r.z,team:1-r.team,i:-1,v:i});
   });
   {const dx=dO[0]-o.x,dy=dO[1]-o.y,dz=dO[2]-o.z,st=M.rbStat||(M.rbStat={n:0,os:0,oe:0,me:0});st.n++;st.oe+=Math.hypot(dx,dy,dz);if(me)st.me+=Math.hypot(me.dox||0,me.doz||0);
     if(Math.hypot(dx,dy,dz)<170){o.dox=dx;o.doy=dy;o.doz=dz}else{o.dox=o.doy=o.doz=0;st.os++}}

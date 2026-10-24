@@ -1827,7 +1827,7 @@ function handleEvents(g){
       const who=e.by>=0&&g.rings[e.by]?g.rings[e.by].name:'';
       fx.banner={t:0,text:e.own?'OWN GOAL':'GOAL',sub:(who&&!g.free?who+' · ':'')+e.spd+' km/h',col:COL[e.team]};
       if(g.free)fx.banner.text='GOAL';
-    }else if(e.type==='bump'){burst(e.x,e.y,COL[e.team],18,500);shake(7);Sfx.bump();if(e.v===app.mySlot)haptic(40)}
+    }else if(e.type==='bump'){burst(e.x,e.y,COL[e.team],18,500);shake(7);Sfx.bump();{const v=app.game&&app.game.rings[e.v];if(v)v.fxT=performance.now()}if(e.v===app.mySlot)haptic(40)}
     else if(e.type==='hit'){if(e.s>500)burst(e.x,e.y,'#ffffff',Math.min(14,e.s/90|0),e.s*.5);Sfx.hit(e.s);if(e.s>900)shake(3)}
     else if(e.type==='dash'){if(e.i===app.mySlot)Sfx.dash()}
     else if(e.type==='wall'){Sfx.wall(e.s)}
@@ -2812,9 +2812,8 @@ function clientRollback(M,g,s){
   // whatever moved: fade from where it was drawn (big differences snap)
   g.rings.forEach((r,i)=>{const dx=disp[i][0]-r.x,dy=disp[i][1]-r.y;if(Math.hypot(dx,dy)<140){r.dox=dx;r.doy=dy}else{r.dox=r.doy=0}
     // a stun this game hadn't shown yet: play the usual bump so it's clear what happened
-    // stuns only count down, so a bigger number than last update means a new hit
-    const sst=num(s.r[i]&&s.r[i][7]),fresh=sst>.15&&sst>(r.snapStun||0)+.05;r.snapStun=sst;
-    if(fresh&&!(disp[i][2]>0))g.events.push({type:'bump',x:r.x,y:r.y,team:1-r.team,i:-1,v:i});
+    // a ring that wasn't stunned on screen is now: play the usual hit (sound, burst, shake) unless it just played
+    if(r.stun>0&&!(disp[i][2]>0)&&now-(r.fxT||0)>400)g.events.push({type:'bump',x:r.x,y:r.y,team:1-r.team,i:-1,v:i});
   });
   {const dx=dO[0]-o.x,dy=dO[1]-o.y,st=M.rbStat||(M.rbStat={n:0,os:0,oe:0,me:0});st.n++;st.oe+=Math.hypot(dx,dy);if(me)st.me+=Math.hypot(me.dox||0,me.doy||0);if(Math.hypot(dx,dy)<160){o.dox=dx;o.doy=dy}else{o.dox=o.doy=0;st.os++}}
 }
